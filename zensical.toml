@@ -50,6 +50,9 @@ Home = "index.md"
 "Video Labelling" = "video.md"
 
 [[project.nav]]
+"Multi-Panel Labelling" = "multi_panel.md"
+
+[[project.nav]]
 Annotators = "annotators.md"
 
 [[project.nav]]

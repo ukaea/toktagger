@@ -7,6 +7,7 @@ import React, {
   useContext,
   useState,
   useEffect,
+  useId,
   useLayoutEffect,
   useRef,
   type RefObject,
@@ -20,7 +21,9 @@ import {
 
 import type { Annotation, VideoFrameLabel, VideoPointInput } from "@/types";
 import { useSample } from "@/app/contexts/SampleContext";
+import { usePanelData } from "@/app/contexts/PanelDataContext";
 import { useVideoUiState } from "@/app/contexts/VideoContext";
+import { useAnnotationTools } from "@/app/contexts/AnnotationToolContext";
 import { VideoFrameLabelSchema, VideoShapeSchema } from "@/types";
 import type {
   ActiveDrawingTool,
@@ -445,19 +448,18 @@ export function VideoSessionProvider(props: {
 }) {
   const { projectId, sampleId, propagate, setPropagate, children } = props;
   const {
-    data,
-    dataParams,
     annotations,
-    isLoading,
     setAnnotations: setSampleAnnotations,
     canAnnotate,
   } = useSample();
+  const { data, dataParams, isLoading } = usePanelData();
+  const { videoDrawingTool, setVideoDrawingTool } = useVideoUiState();
   const {
-    videoEditMode,
-    setVideoEditMode,
-    videoDrawingTool,
-    setVideoDrawingTool,
-  } = useVideoUiState();
+    editMode: sharedEditMode,
+    setEditMode: setSharedEditMode,
+    registerEditModeChange,
+  } = useAnnotationTools();
+  const ownerId = useId();
 
   const api = useAnnotator<AnnotoriousOpenSeadragonAnnotator>();
 
@@ -513,11 +515,9 @@ export function VideoSessionProvider(props: {
   });
   const [drawingTool, setDrawingToolState] =
     useState<ActiveDrawingTool>(videoDrawingTool);
-  const [storedEditMode, setEditModeState] = useState(videoEditMode);
-  // Derived rather than clamped into state, so the saved choice survives canAnnotate resolving late.
-  const editMode = canAnnotate && storedEditMode;
   const [ctrlHeld, setCtrlHeld] = useState(false);
   const [hideAnnotations, setHideAnnotationsState] = useState(false);
+  const editMode = sharedEditMode && !hideAnnotations;
   const hideAnnotationsRef = useRef(false);
 
   const isFramePending =
@@ -551,8 +551,6 @@ export function VideoSessionProvider(props: {
       api?.cancelDrawing?.();
       api?.setSelected?.();
       setCtrlHeld(false);
-      setEditModeState(false);
-      setVideoEditMode(false);
       setDrawingToolState(null);
       setVideoDrawingTool(null);
     }
@@ -735,20 +733,27 @@ export function VideoSessionProvider(props: {
     setVideoDrawingTool(tool);
   };
 
-  // Gate the setter rather than only the toolbar button, so the "e" shortcut cannot
-  // enter edit mode either. Mirrors TimeSeriesContext's setEditMode wrapper.
+  // The shared setter is already gated on canAnnotate, so the "e" shortcut cannot enter edit mode either.
   const setEditMode = (v: boolean) => {
     if (hideAnnotationsRef.current) return;
-    if (!canAnnotate) return;
-    api?.cancelDrawing?.();
-    api?.setSelected?.();
-    flushPendingOverlay();
-    setCtrlHeld(false);
-    setEditModeState(v);
-    setVideoEditMode(v);
+    setSharedEditMode(v);
   };
 
-  // e toggles edit mode and holding Ctrl draws. Ctrl is released on blur so drawing never sticks.
+  // The shared mode also changes from the annotation toolbar and the e key, so the cleanup is registered there.
+  const onEditModeChangeRef = useRef(() => {});
+  useEffect(() => {
+    onEditModeChangeRef.current = () => {
+      api?.cancelDrawing?.();
+      api?.setSelected?.();
+      flushPendingOverlay();
+      setCtrlHeld(false);
+    };
+  });
+  useEffect(
+    () => registerEditModeChange(ownerId, () => onEditModeChangeRef.current()),
+    [ownerId, registerEditModeChange],
+  );
+
   useEffect(() => {
     const releaseCtrl = () => {
       setCtrlHeld(false);
@@ -759,24 +764,10 @@ export function VideoSessionProvider(props: {
     const onKeyDown = (event: KeyboardEvent) => {
       if (isEditableEventTarget(event.target)) return;
 
-      if (event.key === "Control") {
-        if (event.repeat) return;
-        // Commit an in-progress edit first so the overlay sync doesn't revert it.
-        if (editMode) flushCurrentFrameOverlay();
-        setCtrlHeld(true);
-        return;
-      }
-
-      if (
-        event.key.toLowerCase() === "e" &&
-        !event.repeat &&
-        !event.ctrlKey &&
-        !event.metaKey &&
-        !event.altKey &&
-        !hideAnnotationsRef.current
-      ) {
-        setEditMode(!editMode);
-      }
+      if (event.key !== "Control" || event.repeat) return;
+      // Commit an in-progress edit first so the overlay sync doesn't revert it.
+      if (editMode) flushCurrentFrameOverlay();
+      setCtrlHeld(true);
     };
 
     const onKeyUp = (event: KeyboardEvent) => {
@@ -798,7 +789,7 @@ export function VideoSessionProvider(props: {
       window.removeEventListener("blur", releaseCtrl);
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
-  }, [api, editMode, flushCurrentFrameOverlay, setEditMode]);
+  }, [api, editMode, flushCurrentFrameOverlay]);
 
   const clearFrames = (which: "current" | "all") => {
     if (!canAnnotate) return;

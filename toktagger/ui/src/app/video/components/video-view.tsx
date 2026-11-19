@@ -3,6 +3,7 @@
  * Also owns frame navigation, which works by asking SampleContext for a new frame.
  */
 import React, { useEffect } from "react";
+import { createPortal } from "react-dom";
 import { Annotorious } from "@annotorious/react";
 import { ImageDataSchema } from "@/types";
 import {
@@ -19,10 +20,12 @@ import {
   useVideoSession,
 } from "@/app/video/components/video-session";
 import { FrameAnnotatorHost } from "@/app/video/components/frame-annotator-host";
-import { VideoAnnotationToolbar } from "@/app/video/components/video-annotation-toolbar";
+import { VideoAnnotationTools } from "@/app/video/components/video-annotation-toolbar";
 import { FrameJumpField } from "@/app/video/components/ui_elements";
 import { VideoAnnotationsTable } from "@/app/video/components/video-annotations-table";
-import { useSample } from "@/app/contexts/SampleContext";
+import { usePanelData, usePanelId } from "@/app/contexts/PanelDataContext";
+import { useWorkspace } from "@/app/contexts/WorkspaceContext";
+import { usePanelHeight } from "@/app/contexts/PanelHeightContext";
 import { VideoNavAdapterBridge } from "@/app/video/components/video-nav-adapter";
 import {
   VideoUiStateProvider,
@@ -105,7 +108,8 @@ function VideoFrameAnnotator(props: {
   goToRelativeFrame: (delta: number, fallbackFrame: number) => number | null;
 }) {
   const session = useVideoSession();
-  const { videoFrameBounds, isLoading } = useSample();
+  const { videoFrameBounds, isLoading } = usePanelData();
+  const inGridCell = usePanelHeight() !== null;
   const isFramePending = isLoading && props.desiredFrame !== session.frame;
 
   const prevDisabled =
@@ -164,8 +168,10 @@ function VideoFrameAnnotator(props: {
       {/* Frame label badges, then the image. The empty spacer column keeps the image centred. */}
       <Grid
         width="100%"
-        columns={["size-1600", "1fr", "size-1600"]}
-        areas={["labels viewer spacer"]}
+        columns={
+          inGridCell ? ["auto", "1fr"] : ["size-1600", "1fr", "size-1600"]
+        }
+        areas={inGridCell ? ["labels viewer"] : ["labels viewer spacer"]}
         columnGap="size-200"
         alignItems="start"
       >
@@ -196,6 +202,17 @@ function VideoFrameAnnotator(props: {
   );
 }
 
+/** Shows the video drawing tools in the global annotation toolbar while this panel is active. */
+function VideoToolsInToolbar(props: { desiredFrame: number }) {
+  const { videoToolSlot, activePanelId } = useWorkspace();
+  const panelId = usePanelId();
+  if (!videoToolSlot || activePanelId !== panelId) return null;
+  return createPortal(
+    <VideoAnnotationTools desiredFrame={props.desiredFrame} />,
+    videoToolSlot,
+  );
+}
+
 /** Providers for the video view. They also wrap the left toolbox, so it can use the session. */
 export function VideoProviders({ children }: { children: React.ReactNode }) {
   return (
@@ -207,7 +224,7 @@ export function VideoProviders({ children }: { children: React.ReactNode }) {
 
 function VideoProvidersInner({ children }: { children: React.ReactNode }) {
   const { project_id, sample_id } = useParams();
-  const { data } = useSample();
+  const { data } = usePanelData();
   const { videoPropagate, setVideoPropagate } = useVideoUiState();
 
   if (!project_id || !sample_id || !data) {
@@ -232,7 +249,7 @@ function VideoProvidersInner({ children }: { children: React.ReactNode }) {
 
 /** The video view's layout. Must be rendered inside VideoProviders. */
 export function VideoView() {
-  const { data, dataParams, setDataParams } = useSample();
+  const { data, dataParams, setDataParams } = usePanelData();
   // The requested frame, updated straight away so quick repeated clicks step on from it
   const desiredFrameRef = React.useRef<number | null>(null);
 
@@ -330,21 +347,17 @@ export function VideoView() {
   };
 
   return (
-    <div className="min-w-0 flex-1">
-      <div className="flex w-full justify-between">
-        <div className="min-w-0 flex-1 px-4 py-3">
-          <Flex direction="column" gap="size-200">
-            <VideoFrameAnnotator
-              imageBase64={imageBase64}
-              desiredFrame={desiredFrame}
-              goToFrame={goToFrame}
-              goToRelativeFrame={goToRelativeFrame}
-            />
-            <VideoAnnotationsTable />
-          </Flex>
-        </div>
-        <VideoAnnotationToolbar desiredFrame={desiredFrame} />
-      </div>
+    <div className="min-w-0 flex-1 px-4 py-3">
+      <Flex direction="column" gap="size-200">
+        <VideoFrameAnnotator
+          imageBase64={imageBase64}
+          desiredFrame={desiredFrame}
+          goToFrame={goToFrame}
+          goToRelativeFrame={goToRelativeFrame}
+        />
+        <VideoAnnotationsTable />
+      </Flex>
+      <VideoToolsInToolbar desiredFrame={desiredFrame} />
     </div>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import {
-  TIME_SERIES_ANNOTATION_MENU,
+  useAnnotationMenuId,
   useTimeSeriesActions,
   useTimeSeriesState,
 } from "@/app/contexts/TimeSeriesContext";
@@ -34,7 +34,7 @@ export const TimePoint = ({ plotId, plotReady }: ToolingProps) => {
 
   // Hook to trigger the context provider to render context menu
   const { show } = useContextMenu({
-    id: TIME_SERIES_ANNOTATION_MENU,
+    id: useAnnotationMenuId(),
   });
 
   useEffect(() => {

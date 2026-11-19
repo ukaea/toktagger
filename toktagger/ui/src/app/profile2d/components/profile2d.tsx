@@ -14,22 +14,15 @@ import { TimeRegion } from "@/app/components/tools/timeRegion";
 import { TimePoint } from "@/app/components/tools/timePoint";
 import { BoundingBox } from "@/app/components/tools/boundingBox";
 import { Polygon } from "@/app/components/tools/polygon";
-import { AnnotationToolbar } from "@/app/components/tools/annotationToolbar";
-import { AnnotationsTable } from "@/app/components/ui/annotationsTable";
 import "react-contexify/ReactContexify.css";
 import { useSample } from "@/app/contexts/SampleContext";
-import { useElementHeight } from "@/app/hooks/useElementHeight";
+import { usePanelData, usePlotId } from "@/app/contexts/PanelDataContext";
+import { useFigureHeight } from "@/app/contexts/PanelHeightContext";
 import { useEffect, useState } from "react";
-import { View } from "@adobe/react-spectrum";
+import { Flex, View } from "@adobe/react-spectrum";
 
 // The subplot annotations with real y values should be restricted to.
 const HEATMAP_SUBPLOT = "xy2";
-
-// Floor for the plot, also used before the container has been measured. The
-// heatmap takes the upper 80% and the integrated trace the lower 20%, so this
-// leaves them ~380px and ~95px. The plot never renders smaller than this - the
-// column scrolls instead.
-const MIN_PLOT_HEIGHT = 480;
 
 // Plotly supports a shared color axis but @types/plotly.js does not declare it.
 type ColorAxis = {
@@ -253,7 +246,8 @@ const PLOT_CONFIG: Partial<Plotly.Config> = {
 };
 
 export const Profile2dView = () => {
-  const { data, plotProps, viewParams } = useSample();
+  const { plotProps } = useSample();
+  const { data, viewParams } = usePanelData();
 
   const viewData = data as Profile2DData | null;
   const profileViewParams = viewParams as Profile2DViewParams | null;
@@ -272,8 +266,8 @@ export const Profile2dView = () => {
   }, []);
 
   // Before the plot is built: the compiler won't memoise across a hook, and a rebuilt plot drops mid-draw shapes.
-  const { ref: plotAreaRef, height: plotAreaHeight } =
-    useElementHeight<HTMLDivElement>();
+  const figureHeight = useFigureHeight(0.9);
+  const plotId = usePlotId("Profile2DView");
 
   const plot =
     viewData && plotProps
@@ -289,10 +283,8 @@ export const Profile2dView = () => {
       ? buildPlotData(viewData, plot.values, plotProps?.thresholdActive)
       : [];
 
-  const plotHeight = Math.max(plotAreaHeight, MIN_PLOT_HEIGHT);
-
   const plotLayout = plot
-    ? buildPlotLayout(plot.colorAxis, isDarkMode, plotHeight)
+    ? buildPlotLayout(plot.colorAxis, isDarkMode, figureHeight)
     : {};
 
   if (!viewData || !profileViewParams || !plot) {
@@ -300,39 +292,30 @@ export const Profile2dView = () => {
   }
 
   return (
-    <View width="100%" height="100%" minHeight={0}>
-      <TimeSeriesProvider signalName={profileViewParams.signal_name}>
-        <div className="flex h-full min-h-0 flex-row justify-between">
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto">
-            <div
-              ref={plotAreaRef}
-              style={{
-                flex: `1 0 ${MIN_PLOT_HEIGHT}px`,
-                minHeight: MIN_PLOT_HEIGHT,
+    <View width="100%">
+      <Flex justifyContent="center" alignItems="center">
+        <TimeSeriesProvider signalName={profileViewParams.signal_name}>
+          <Flex direction="column" flex gap="size-200">
+            <BaseTimeSeriesPlot
+              plotId={plotId}
+              ariaLabel="profile-2d"
+              linkTime
+              plotConfig={{
+                data: plotData,
+                config: PLOT_CONFIG,
+                layout: plotLayout,
               }}
+              rescaleOnZoom={false}
+              muteHoverWhileDrawing
             >
-              <BaseTimeSeriesPlot
-                plotId="Profile2DView"
-                ariaLabel="profile-2d"
-                plotConfig={{
-                  data: plotData,
-                  config: PLOT_CONFIG,
-                  layout: plotLayout,
-                }}
-                rescaleOnZoom={false}
-                muteHoverWhileDrawing
-              >
-                <TimeRegion />
-                <TimePoint />
-                <BoundingBox subplot={HEATMAP_SUBPLOT} />
-                <Polygon subplot={HEATMAP_SUBPLOT} />
-              </BaseTimeSeriesPlot>
-            </div>
-            <AnnotationsTable />
-          </div>
-          <AnnotationToolbar />
-        </div>
-      </TimeSeriesProvider>
+              <TimeRegion />
+              <TimePoint />
+              <BoundingBox subplot={HEATMAP_SUBPLOT} />
+              <Polygon subplot={HEATMAP_SUBPLOT} />
+            </BaseTimeSeriesPlot>
+          </Flex>
+        </TimeSeriesProvider>
+      </Flex>
     </View>
   );
 };

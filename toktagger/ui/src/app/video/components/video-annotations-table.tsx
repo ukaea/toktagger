@@ -28,7 +28,7 @@ import ImageMapPolygon from "@spectrum-icons/workflow/ImageMapPolygon";
 import ImageMapRectangle from "@spectrum-icons/workflow/ImageMapRectangle";
 import Label from "@spectrum-icons/workflow/Label";
 import Target from "@spectrum-icons/workflow/Target";
-import { useSample } from "@/app/contexts/SampleContext";
+import { usePanelData } from "@/app/contexts/PanelDataContext";
 import { useVideoUiState } from "@/app/contexts/VideoContext";
 import { displayCreatedBy } from "@/types";
 import {
@@ -125,7 +125,7 @@ const VideoRowActions = ({
   onRequestDelete: (instance: InstanceProfile) => void;
 }) => {
   const { editMode, deleteInstanceOnCurrentFrame } = useVideoSession();
-  const { setDataParams } = useSample();
+  const { setDataParams } = usePanelData();
   const selectInstance = useSelectInstance();
 
   const jumpToAnnotation = () => {

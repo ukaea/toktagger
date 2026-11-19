@@ -1,8 +1,9 @@
 "use client";
 
-import React, { createContext, useContext } from "react";
+import { useEffect, useRef } from "react";
 import { useSample } from "@/app/contexts/SampleContext";
 import { useAuth } from "@/app/contexts/AuthContext";
+import { useWorkspace } from "@/app/contexts/WorkspaceContext";
 import {
   deleteAnnotationsByIds,
   deleteSampleAnnotations,
@@ -10,24 +11,26 @@ import {
 } from "@/app/core";
 import { type Annotation, type NavAdapter } from "@/types";
 
-const NavAdapterContext = createContext<NavAdapter | null>(null);
+/** Registers the save/clear behaviour of one panel with the workspace navigation. */
+export function useRegisterNavAdapter(panelId: string, adapter: NavAdapter) {
+  const { registerNavAdapter } = useWorkspace();
+  const adapterRef = useRef(adapter);
+  useEffect(() => {
+    adapterRef.current = adapter;
+  });
 
-export function NavAdapterProvider({
-  value,
-  children,
-}: {
-  value: NavAdapter;
-  children: React.ReactNode;
-}) {
-  return (
-    <NavAdapterContext.Provider value={value}>
-      {children}
-    </NavAdapterContext.Provider>
+  useEffect(
+    () =>
+      registerNavAdapter(panelId, {
+        getAnnotations: () => adapterRef.current.getAnnotations(),
+        clear: (includeOthers?: boolean) =>
+          adapterRef.current.clear(includeOthers),
+        syncRemovals: () =>
+          adapterRef.current.syncRemovals?.() ?? Promise.resolve(),
+        afterSave: () => adapterRef.current.afterSave?.(),
+      }),
+    [panelId, registerNavAdapter],
   );
-}
-
-export function useNavAdapterOptional(): NavAdapter | null {
-  return useContext(NavAdapterContext);
 }
 
 // Handles deletions explicitly since a batch save only replaces the caller's own annotations.
@@ -47,8 +50,8 @@ export function useSyncRemovals(): () => Promise<void> {
   };
 }
 
+/** Combines the adapters of all panels; panels without one use the sample-level default. */
 export function useNavAdapter(): NavAdapter {
-  const navAdapter = useNavAdapterOptional();
   const {
     annotations,
     serverAnnotations,
@@ -59,12 +62,9 @@ export function useNavAdapter(): NavAdapter {
   } = useSample();
   const { user } = useAuth();
   const syncRemovals = useSyncRemovals();
+  const { panelIds, getNavAdapters } = useWorkspace();
 
-  if (navAdapter) {
-    return navAdapter;
-  }
-
-  return {
+  const fallback: NavAdapter = {
     getAnnotations: () => annotations,
     syncRemovals,
     afterSave: () => {
@@ -106,5 +106,30 @@ export function useNavAdapter(): NavAdapter {
         previousAnnotations.filter(isOthers),
       );
     },
+  };
+
+  const activeAdapters = (): NavAdapter[] => {
+    const registered = getNavAdapters();
+    const adapters = panelIds.flatMap((panelId) => {
+      const adapter = registered.get(panelId);
+      return adapter ? [adapter] : [];
+    });
+    return adapters.length < panelIds.length || adapters.length === 0
+      ? [...adapters, fallback]
+      : adapters;
+  };
+
+  return {
+    // Every adapter reads the same sample annotations, so the first one is enough.
+    getAnnotations: () => activeAdapters()[0].getAnnotations(),
+    // Removals are found from the sample's annotations, so one call covers every panel.
+    syncRemovals,
+    clear: async (includeOthers?: boolean) => {
+      await Promise.all(
+        activeAdapters().map((adapter) => adapter.clear(includeOthers)),
+      );
+    },
+    afterSave: () =>
+      activeAdapters().forEach((adapter) => adapter.afterSave?.()),
   };
 }

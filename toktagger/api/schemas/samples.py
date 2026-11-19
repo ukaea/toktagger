@@ -1,9 +1,10 @@
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, Field, computed_field
+from pydantic import BaseModel, Field, computed_field, model_validator
 
 from toktagger.api.schemas import ConfiguredModel
 from toktagger.api.schemas.annotations import AnnotationBatchTypes
+from toktagger.api.schemas.layouts import DEFAULT_SOURCE
 
 
 class FileData(BaseModel):
@@ -36,6 +37,22 @@ DataTypes = TimeSeriesFileData | ImageFileData | ImageArrayFileData | ShotData
 class SampleBase(ConfiguredModel):
     shot_id: int
     data: DataTypes
+    sources: dict[str, DataTypes] = Field(
+        default_factory=dict,
+        description="The data of this sample for each project data source.",
+    )
+
+    @model_validator(mode="before")
+    @classmethod
+    def fill_sources(cls, values: Any) -> Any:
+        if not isinstance(values, dict):
+            return values
+        sources = values.get("sources")
+        if values.get("data") is None and sources:
+            values["data"] = sources.get(DEFAULT_SOURCE, next(iter(sources.values())))
+        elif values.get("data") is not None and not sources:
+            values["sources"] = {DEFAULT_SOURCE: values["data"]}
+        return values
 
 
 class SampleIn(SampleBase):

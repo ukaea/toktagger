@@ -333,6 +333,11 @@ def test_profile2d_edit_mode_relabel_and_delete(server_setup, page: Page):
 
     expect(page.get_by_role("gridcell", name="ELM", exact=True)).to_be_visible()
     expect(page.get_by_role("gridcell", name="NTM", exact=True)).to_have_count(0)
+    # The workspace table updates a render before the plot, whose zones carry the menu's annotation.
+    page.wait_for_function(
+        "() => [...document.querySelectorAll('[aria-label=time-zone]')]"
+        ".every((zone) => zone.__data__?.label === 'ELM')"
+    )
 
     # Delete it.
     page.get_by_label("time-zone").first.click(button="right", force=True)

@@ -13,17 +13,20 @@ import React, {
   createContext,
   useContext,
   useEffect,
+  useId,
   useRef,
   useState,
 } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { useSample } from "./SampleContext";
 import { useAuth } from "./AuthContext";
+import { useAnnotationTools } from "./AnnotationToolContext";
+import { usePanelId } from "./PanelDataContext";
+import { useWorkspace } from "./WorkspaceContext";
 import {
   convertRawAnnotationsToTimeSeries,
   convertTimeSeriesToRawAnnotations,
   isTimeSeriesAnnotation,
-  randomColor,
 } from "../utils";
 import { Item, ItemParams, Menu, Submenu } from "react-contexify";
 
@@ -88,47 +91,18 @@ export const useTimeSeriesState = () => {
 
 export const TIME_SERIES_ANNOTATION_MENU = "time-series-annotation-menu";
 
-function isEditableEventTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false;
-  if (target.isContentEditable) return true;
-  if (target instanceof HTMLTextAreaElement) return true;
-  if (target instanceof HTMLSelectElement) return true;
-  if (target instanceof HTMLInputElement) {
-    return target.type !== "checkbox" && target.type !== "radio";
-  }
-  return false;
-}
+// Each provider owns its own menu, so panels with the same tools do not open each other's menu.
+const AnnotationMenuIdContext = createContext(TIME_SERIES_ANNOTATION_MENU);
 
-const activeToolKey = (projectId: string) => `ts-active-tool-${projectId}`;
+export const useAnnotationMenuId = () => useContext(AnnotationMenuIdContext);
 
-// Reads a persisted tool, discarding anything that isn't a well-formed
-// TimeSeriesToolDefinition so that corrupt storage cannot throw during render.
-// The label is not checked here - that needs the project's categories, which
-// are not loaded yet at this point.
-function readSavedTool(projectId: string): TimeSeriesToolDefinition | null {
-  if (!projectId) return null;
-  const saved = sessionStorage.getItem(activeToolKey(projectId));
-  if (!saved) return null;
-
-  try {
-    const parsed: unknown = JSON.parse(saved);
-    if (
-      typeof parsed === "object" &&
-      parsed !== null &&
-      typeof (parsed as TimeSeriesToolDefinition).label === "string" &&
-      Object.values(TimeSeriesAnnotationType).includes(
-        (parsed as TimeSeriesToolDefinition).type,
-      )
-    ) {
-      return parsed as TimeSeriesToolDefinition;
-    }
-  } catch {
-    // Malformed JSON - fall through and discard.
-  }
-
-  sessionStorage.removeItem(activeToolKey(projectId));
-  return null;
-}
+// Annotations bound to another signal belong to other panels, so they are kept but not shown here.
+const isShownForSignal =
+  (signalName: string | null) =>
+  (annotation: { signal_name?: string | null }) =>
+    signalName === null ||
+    !annotation.signal_name ||
+    annotation.signal_name === signalName;
 
 export const TimeSeriesProvider = ({
   signalName = null,
@@ -141,62 +115,44 @@ export const TimeSeriesProvider = ({
   const {
     annotations: rawAnnotations,
     setAnnotations: setRawAnnotations,
-    project,
     canAnnotate,
   } = useSample();
-
-  // project is guaranteed non-null here: TimeSeriesProvider is only rendered
-  // after SampleView confirms project is loaded.
-  const projectId = project?._id ?? "";
   const { user } = useAuth();
 
   const [annotations, setAnnotations] = useState<TimeSeriesAnnotation[]>([]);
+  const annotationMenuId = `${TIME_SERIES_ANNOTATION_MENU}-${useId().replace(/[^A-Za-z0-9_-]/g, "")}`;
   const [toolingCallbacks, setToolingCallbacks] = useState<
     Map<TimeSeriesAnnotationType, ToolingCallbacks>
   >(new Map());
-  const [activeTool, setActiveTool] = useState<TimeSeriesToolDefinition | null>(
-    null,
-  );
-  // A restored tool cannot be applied on mount: tooling callbacks register from
-  // child components and categories come from the project, so neither is
-  // available yet. Hold it here until both are, then validate and apply.
-  const [pendingTool, setPendingTool] =
-    useState<TimeSeriesToolDefinition | null>(() => readSavedTool(projectId));
   const [updateCounter, setUpdateCounter] = useState(0);
   const [syncCounter, setSyncCounter] = useState(0);
   const [syncRequest, setSyncRequest] = useState(0);
-  const [isDrawing, setIsDrawing] = useState(false);
-  const [categories, setCategories] = useState<Map<string, TimeSeriesCategory>>(
-    new Map(),
-  );
-  const [editMode, setEditModeRaw] = useState<boolean>(
-    () => sessionStorage.getItem(`ts-edit-mode-${projectId}`) === "true",
-  );
   const [ongoingAction, setOngoingAction] = useState(false);
+  const {
+    editMode,
+    setEditMode,
+    activeAnnotationTool: activeTool,
+    setAnnotationTool,
+    categories,
+    isDrawing,
+    registerToolTypes,
+    registerCancel,
+    registerEditModeChange,
+  } = useAnnotationTools();
+  const panelId = usePanelId();
+  const { activePanelId } = useWorkspace();
+  const ownerId = useId();
+  const isActivePanel = !panelId || activePanelId === panelId;
   const [focusXRange, setFocusXRange] = useState<[number, number] | null>(null);
 
-  // Viewers can't enter edit mode - gated here (rather than only disabling the
-  // toolbar button) so the "e" keyboard shortcut is blocked too.
-  const setEditMode = (update: boolean | ((prev: boolean) => boolean)) => {
-    const next =
-      canAnnotate && (typeof update === "function" ? update(editMode) : update);
-    // Leaving edit mode commits pending edits now, so a quick Save cannot miss the sync debounce.
-    if (editMode && !next) setSyncCounter((prev) => (prev + 1) % 100);
-    setEditModeRaw(next);
-  };
-
-  // If the role check resolves to "can't annotate" after edit mode was already on
-  // (e.g. restored from a previous session, or a mid-session role change), drop back
-  // to view mode.
-  useEffect(() => {
-    if (!canAnnotate) setEditModeRaw(false);
-  }, [canAnnotate]);
-
-  // Persist editMode to sessionStorage on every change
-  useEffect(() => {
-    if (!projectId) return;
-    sessionStorage.setItem(`ts-edit-mode-${projectId}`, String(editMode));
-  }, [editMode, projectId]);
+  // Leaving edit mode commits pending edits now, so a quick Save cannot miss the sync debounce.
+  useEffect(
+    () =>
+      registerEditModeChange(ownerId, (next) => {
+        if (!next) setSyncCounter((prev) => (prev + 1) % 100);
+      }),
+    [ownerId, registerEditModeChange],
+  );
 
   // Selection is an Edit Mode concept, so leaving Edit Mode clears it
   useEffect(() => {
@@ -208,21 +164,8 @@ export const TimeSeriesProvider = ({
     );
   }, [editMode]);
 
-  // Persist activeTool to sessionStorage on every change. Skipped while a
-  // restore is pending, so the initial null does not wipe the saved tool.
-  useEffect(() => {
-    if (!projectId || pendingTool) return;
-    if (activeTool) {
-      sessionStorage.setItem(
-        activeToolKey(projectId),
-        JSON.stringify(activeTool),
-      );
-    } else {
-      sessionStorage.removeItem(activeToolKey(projectId));
-    }
-  }, [activeTool, projectId, pendingTool]);
-
   const lastSyncCount = useRef<number>(0);
+  const pendingSyncRef = useRef(false);
 
   const parseRawAnnotations = (
     annotations: Annotation[],
@@ -249,6 +192,8 @@ export const TimeSeriesProvider = ({
   // The sample's annotations are shared with other tools, so this view must replace
   // only its own and carry the rest through untouched. Without this, annotations it
   // cannot represent - shot labels, for example - are lost on every edit.
+  const isShownHere = isShownForSignal(signalName);
+
   const mergeTimeSeriesAnnotations = (
     previous: Annotation[],
     updated: TimeSeriesAnnotation[],
@@ -265,7 +210,10 @@ export const TimeSeriesProvider = ({
         .map((annotation) => [annotation._id, annotation]),
     );
     return [
-      ...previous.filter((annotation) => !isTimeSeriesAnnotation(annotation)),
+      ...previous.filter(
+        (annotation) =>
+          !isTimeSeriesAnnotation(annotation) || !isShownHere(annotation),
+      ),
       ...parseTimeSeriesAnnotations(updated).map((annotation) => {
         const existing = annotation._id
           ? stored.get(annotation._id)
@@ -294,51 +242,10 @@ export const TimeSeriesProvider = ({
     setOngoingAction(false);
   };
 
-  useEffect(() => {
-    if (!project) return;
-    const timeSeriesCategories: Map<string, TimeSeriesCategory> = new Map();
-    if (project.time_point_labels) {
-      project.time_point_labels.forEach((label, index) => {
-        const category_id = `${TimeSeriesAnnotationType.TIME_POINT}_${label}`;
-        timeSeriesCategories.set(category_id, {
-          label,
-          color: randomColor(index),
-          type: TimeSeriesAnnotationType.TIME_POINT,
-        });
-      });
-    }
-    if (project.time_region_labels) {
-      project.time_region_labels.forEach((label, index) => {
-        const category_id = `${TimeSeriesAnnotationType.TIME_REGION}_${label}`;
-        timeSeriesCategories.set(category_id, {
-          label,
-          color: randomColor(index),
-          type: TimeSeriesAnnotationType.TIME_REGION,
-        });
-      });
-    }
-    if (project.bounding_box_labels) {
-      project.bounding_box_labels.forEach((label, index) => {
-        const category_id = `${TimeSeriesAnnotationType.BOUNDING_BOX}_${label}`;
-        timeSeriesCategories.set(category_id, {
-          label,
-          color: randomColor(index),
-          type: TimeSeriesAnnotationType.BOUNDING_BOX,
-        });
-      });
-    }
-    if (project.polygon_labels) {
-      project.polygon_labels.forEach((label, index) => {
-        const category_id = `${TimeSeriesAnnotationType.POLYGON}_${label}`;
-        timeSeriesCategories.set(category_id, {
-          label,
-          color: randomColor(index),
-          type: TimeSeriesAnnotationType.POLYGON,
-        });
-      });
-    }
-    setCategories(timeSeriesCategories);
-  }, [project]);
+  useEffect(
+    () => registerToolTypes(panelId ?? ownerId, [...toolingCallbacks.keys()]),
+    [ownerId, panelId, registerToolTypes, toolingCallbacks],
+  );
 
   // This is a reference to allow the up-to-date function to be called from within an effect without triggering a refresh
   const cancelOngoingActionRef = useRef(cancelOngoingAction);
@@ -346,13 +253,21 @@ export const TimeSeriesProvider = ({
     cancelOngoingActionRef.current = cancelOngoingAction;
   }, [cancelOngoingAction]);
 
+  useEffect(
+    () => registerCancel(ownerId, () => cancelOngoingActionRef.current()),
+    [ownerId, registerCancel],
+  );
+
   useEffect(() => {
     cancelOngoingActionRef.current(); // If the annotations are changed, any ongoing annotations must be cancelled
-    setAnnotations(parseRawAnnotations(rawAnnotations));
-  }, [parseRawAnnotations, rawAnnotations]);
+    setAnnotations(
+      parseRawAnnotations(rawAnnotations).filter(isShownForSignal(signalName)),
+    );
+  }, [parseRawAnnotations, rawAnnotations, signalName]);
 
   // Each request restarts the timer; a ref-held timeout would stop the compiler memoising the callers.
   const requestSync = () => {
+    pendingSyncRef.current = true;
     setSyncRequest((prev) => prev + 1);
   };
 
@@ -369,6 +284,7 @@ export const TimeSeriesProvider = ({
       requestSync();
       return;
     }
+    pendingSyncRef.current = false;
     setRawAnnotations((prev) => mergeTimeSeriesAnnotations(prev, annotations));
   };
 
@@ -377,6 +293,21 @@ export const TimeSeriesProvider = ({
     lastSyncCount.current = syncCounter;
     syncAnnotations();
   }, [syncAnnotations, syncCounter]);
+
+  // A panel on a hidden tab unmounts, so an edit that has not synced yet is committed first.
+  const flushSyncRef = useRef(() => {});
+  useEffect(() => {
+    flushSyncRef.current = () =>
+      setRawAnnotations((prev) =>
+        mergeTimeSeriesAnnotations(prev, annotations),
+      );
+  }, [annotations, mergeTimeSeriesAnnotations, setRawAnnotations]);
+  useEffect(
+    () => () => {
+      if (pendingSyncRef.current) flushSyncRef.current();
+    },
+    [],
+  );
 
   const createAnnotation = (
     type: TimeSeriesAnnotationType,
@@ -425,49 +356,6 @@ export const TimeSeriesProvider = ({
       return newMap;
     });
   };
-
-  const setAnnotationTool = (tool: TimeSeriesToolDefinition | null) => {
-    if (!tool || toolingCallbacks.has(tool.type)) {
-      cancelOngoingAction(); // Switching tools mid-draw abandons whatever was in progress
-      setActiveTool(tool);
-      return;
-    }
-    console.warn(
-      `Could not set ${tool.type} as active tool since no callback has been registered`,
-    );
-  };
-
-  // Lets a mid-draw annotation be abandoned via Escape, in addition to switching tools
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        cancelOngoingAction();
-      }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [cancelOngoingAction]);
-
-  // Apply a restored tool once tooling and categories have registered. The
-  // label is checked against the project's current categories, since it may
-  // have been removed since the tool was saved; setAnnotationTool applies the
-  // remaining guard that a callback exists for the type.
-  useEffect(() => {
-    if (!pendingTool) return;
-    if (toolingCallbacks.size === 0 || categories.size === 0) return;
-
-    const labelExists = Array.from(categories.values()).some(
-      (category) =>
-        category.type === pendingTool.type &&
-        category.label === pendingTool.label,
-    );
-    if (labelExists) {
-      setAnnotationTool(pendingTool);
-    } else {
-      sessionStorage.removeItem(activeToolKey(projectId));
-    }
-    setPendingTool(null);
-  }, [pendingTool, toolingCallbacks, categories, projectId, setAnnotationTool]);
 
   const updateAnnotation = (annotation: TimeSeriesAnnotation) => {
     requestSync();
@@ -625,7 +513,7 @@ export const TimeSeriesProvider = ({
   };
 
   useEffect(() => {
-    if (!editMode) return;
+    if (!editMode || !isActivePanel) return;
 
     const deleteSelection = (event: KeyboardEvent) => {
       if (event.key === "Delete" || event.key === "Backspace") {
@@ -642,46 +530,10 @@ export const TimeSeriesProvider = ({
     annotations,
     batchDeleteAnnotations,
     editMode,
+    isActivePanel,
     parseTimeSeriesAnnotations,
     setRawAnnotations,
   ]);
-
-  // setEditMode is re-created whenever canAnnotate changes, so it's read through a ref
-  // rather than a dependency here - re-registering these listeners on that change would
-  // tear down the "Control" keydown/keyup pair mid-drag and break the ctrl-drag gesture
-  // tools rely on to draw. The ref always has the latest guard.
-  const setEditModeRef = useRef(setEditMode);
-  useEffect(() => {
-    setEditModeRef.current = setEditMode;
-  }, [setEditMode]);
-
-  useEffect(() => {
-    const keyDownHandler = (event: KeyboardEvent) => {
-      if (isEditableEventTarget(event.target)) return;
-
-      if (event.key === "Control") {
-        setIsDrawing(true);
-      }
-
-      if (event.key === "e") {
-        setEditModeRef.current((prev) => !prev);
-      }
-    };
-
-    const keyUpHandler = (event: KeyboardEvent) => {
-      if (event.key === "Control") {
-        setIsDrawing(false);
-      }
-    };
-
-    document.addEventListener("keydown", keyDownHandler);
-    document.addEventListener("keyup", keyUpHandler);
-
-    return () => {
-      document.removeEventListener("keydown", keyDownHandler);
-      document.removeEventListener("keyup", keyUpHandler);
-    };
-  }, []);
 
   const annotationLabels = Array.from(categories.values()).map(
     (category, index) => {
@@ -715,8 +567,10 @@ export const TimeSeriesProvider = ({
   return (
     <TimeSeriesActionsContext.Provider value={actionsValue}>
       <TimeSeriesStateContext value={stateValue}>
-        {children}
-        <Menu id={`${TIME_SERIES_ANNOTATION_MENU}`}>
+        <AnnotationMenuIdContext.Provider value={annotationMenuId}>
+          {children}
+        </AnnotationMenuIdContext.Provider>
+        <Menu id={annotationMenuId}>
           <Item
             id="delete"
             onClick={({ props }: ItemParams) => {

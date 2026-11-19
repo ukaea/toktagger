@@ -17,6 +17,7 @@ import {
   getSamplePredictions,
 } from "@/app/core";
 import { useSample } from "@/app/contexts/SampleContext";
+import { usePanelData } from "@/app/contexts/PanelDataContext";
 import ModelForm from "@/app/components/ui/schemaForm";
 import { RJSFSchema } from "@rjsf/utils";
 import Form from "@rjsf/core";
@@ -28,7 +29,8 @@ type ModelPredictInfo = {
 };
 
 export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
-  const { annotations, project, dataParams, setAnnotations } = useSample();
+  const { annotations, project, setAnnotations } = useSample();
+  const { dataParams } = usePanelData();
   const [isEnabled, setIsEnabled] = useState<boolean>(() => {
     return annotations.some(
       (ann) =>

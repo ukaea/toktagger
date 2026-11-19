@@ -21,6 +21,7 @@ A project defines the annotation task, data source, and labeling configuration f
         - `profile-2d` - Label 2D signals (for example spectrograms) shown as a heatmap against time
         - `radial-profile` - Label radial profiles (for example Thomson scattering) by radius and time, next to time series signals. Refer to [Radial Profile Labelling](radial_profile.md)
         - `video` - Frame-by-frame bounding box annotation of video data
+        - `multi-panel` - Show many views of one shot together, for example radial profiles, a spectrogram, time series and video. Refer to [Multi-Panel Labelling](multi_panel.md)
     - **Data Loader**: [Where your data comes from:](./data_loaders.md)
         - `uda` - Load signals using UDA (for MAST/MAST-U data)
         - `uda_camera` - Load camera images from UDA (for MAST/MAST-U data)

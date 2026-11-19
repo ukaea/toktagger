@@ -1,7 +1,7 @@
 "use client";
 
 import {
-  TIME_SERIES_ANNOTATION_MENU,
+  useAnnotationMenuId,
   useTimeSeriesActions,
   useTimeSeriesState,
 } from "@/app/contexts/TimeSeriesContext";
@@ -80,7 +80,7 @@ export const RadialRange = ({
   const currentAnnotation = useRef<TimeSeriesAnnotation | null>(null);
   const dragOffset = useRef(0);
 
-  const { show } = useContextMenu({ id: TIME_SERIES_ANNOTATION_MENU });
+  const { show } = useContextMenu({ id: useAnnotationMenuId() });
 
   useEffect(() => {
     if (projection !== "radius") return;

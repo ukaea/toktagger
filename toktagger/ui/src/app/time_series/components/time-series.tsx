@@ -14,23 +14,14 @@ import {
 } from "@/app/utils";
 import { useEffect, useState } from "react";
 import { TimePoint } from "@/app/components/tools/timePoint";
-import { useSample } from "@/app/contexts/SampleContext";
-import { View } from "@adobe/react-spectrum";
-import { AnnotationsTable } from "@/app/components/ui/annotationsTable";
-import { AnnotationToolbar } from "@/app/components/tools/annotationToolbar";
-import { useElementHeight } from "@/app/hooks/useElementHeight";
-
-// The traces are stacked, so each one needs its own share of the height. The
-// plot never renders smaller than this - the column scrolls instead. The
-// rangeslider takes 10% of the plot, hence the extra.
-const MIN_TRACE_HEIGHT = 105;
-const RANGESLIDER_FRACTION = 0.1;
-
-// Floor for a single trace, also used before the container has been measured.
-const MIN_PLOT_HEIGHT = 320;
+import { usePanelData, usePlotId } from "@/app/contexts/PanelDataContext";
+import { useFigureHeight } from "@/app/contexts/PanelHeightContext";
+import { Flex, View } from "@adobe/react-spectrum";
 
 export const TimeSeriesView = () => {
-  const { data } = useSample();
+  const { data } = usePanelData();
+  const figureHeight = useFigureHeight(0.9);
+  const plotId = usePlotId("TimesSeriesView");
 
   const [plotData, setPlotData] = useState<Partial<Plotly.PlotData>[]>([]);
 
@@ -65,18 +56,6 @@ export const TimeSeriesView = () => {
     setPlotData(assignStackedYAxes(plotData));
   }, [data, viewData]);
 
-  // The plot grows into spare height, but never shrinks below what the stacked
-  // traces need to stay legible - the column scrolls instead.
-  const { ref: plotAreaRef, height: plotAreaHeight } =
-    useElementHeight<HTMLDivElement>();
-  const minPlotHeight = Math.max(
-    MIN_PLOT_HEIGHT,
-    Math.round(
-      (plotData.length * MIN_TRACE_HEIGHT) / (1 - RANGESLIDER_FRACTION),
-    ),
-  );
-  const plotHeight = Math.max(plotAreaHeight, minPlotHeight);
-
   let maxTime = -Infinity;
   let minTime = Infinity;
 
@@ -100,7 +79,7 @@ export const TimeSeriesView = () => {
       //grid: { rows: 1, columns: 1, pattern: "independent" },
       dragmode: "pan",
       autosize: true,
-      height: plotHeight,
+      height: figureHeight,
       xaxis: {
         minallowed: minTime,
         maxallowed: maxTime,
@@ -127,30 +106,21 @@ export const TimeSeriesView = () => {
   }
 
   return (
-    <View width="100%" height="100%" minHeight={0}>
-      <TimeSeriesProvider>
-        <div className="flex h-full min-h-0 flex-row justify-between">
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto">
-            <div
-              ref={plotAreaRef}
-              style={{
-                flex: `1 0 ${minPlotHeight}px`,
-                minHeight: minPlotHeight,
-              }}
+    <View width="100%">
+      <Flex justifyContent="center" alignItems="center">
+        <TimeSeriesProvider>
+          <Flex direction="column" flex gap="size-200">
+            <BaseTimeSeriesPlot
+              plotId={plotId}
+              plotConfig={{ data: plotData, layout: plotLayout }}
+              linkTime
             >
-              <BaseTimeSeriesPlot
-                plotId="TimesSeriesView"
-                plotConfig={{ data: plotData, layout: plotLayout }}
-              >
-                <TimeRegion />
-                <TimePoint />
-              </BaseTimeSeriesPlot>
-            </div>
-            <AnnotationsTable />
-          </div>
-          <AnnotationToolbar />
-        </div>
-      </TimeSeriesProvider>
+              <TimeRegion />
+              <TimePoint />
+            </BaseTimeSeriesPlot>
+          </Flex>
+        </TimeSeriesProvider>
+      </Flex>
     </View>
   );
 };

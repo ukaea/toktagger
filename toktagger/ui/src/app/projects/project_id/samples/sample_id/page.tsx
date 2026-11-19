@@ -1,55 +1,33 @@
 "use client";
 
-import React from "react";
 import { TaskType } from "@/types";
-import { TimeSeriesView } from "@/app/time_series/components/time-series";
-import { Profile2dView } from "@/app/profile2d/components/profile2d";
-import { RadialProfileView } from "@/app/radial_profile/components/radial-profile";
 import ToolBar from "@/app/components/tools/toolbar";
 import { useParams } from "react-router-dom";
 import ErrorView from "@/app/views/error";
 import ForbiddenView from "@/app/views/forbidden";
 import LoadingView from "@/app/views/loading";
 import { SampleProvider, useSample } from "@/app/contexts/SampleContext";
-import { VideoProviders, VideoView } from "@/app/video/components/video-view";
+import {
+  PanelDataProvider,
+  panelsOfTabs,
+  tabsForProject,
+} from "@/app/contexts/PanelDataContext";
+import { WorkspaceProvider } from "@/app/contexts/WorkspaceContext";
+import { PanelFrame } from "@/app/panels/panel-frame";
+import { WorkspaceView } from "@/app/panels/workspace-view";
 import { SampleHistoryProvider } from "@/app/contexts/SampleHistoryContext";
+import { AnnotationToolProvider } from "@/app/contexts/AnnotationToolContext";
+import { AnnotationToolbar } from "@/app/components/tools/annotationToolbar";
+import {
+  AnnotationsTable,
+  TIME_PANEL_KINDS,
+} from "@/app/components/ui/annotationsTable";
 import { useBreadcrumbs } from "@/app/contexts/BreadcrumbContext";
-
-const SampleView = () => {
-  const { project, error, errorStatus, isLoading, data } = useSample();
-  if (!project) return null;
-  if (error)
-    return errorStatus === 403 ? (
-      <ForbiddenView message={error} />
-    ) : (
-      <ErrorView message={error} />
-    );
-
-  // Only swap in the loading view before there is anything to show: doing it on a
-  // background refetch unmounts the view and loses annotations not yet synced to the sample.
-  if (project.task === TaskType.TimeSeries)
-    return isLoading && !data ? <LoadingView /> : <TimeSeriesView />;
-  if (project.task === TaskType.Video)
-    return isLoading && !data ? <LoadingView /> : <VideoView />;
-  if (project.task === TaskType.Profile2D)
-    return isLoading && !data ? <LoadingView /> : <Profile2dView />;
-  if (project.task === TaskType.RadialProfile)
-    return isLoading && !data ? <LoadingView /> : <RadialProfileView />;
-  return null;
-};
-
-function SampleTaskProviders({ children }: { children: React.ReactNode }) {
-  const { project } = useSample();
-
-  if (project?.task === TaskType.Video) {
-    return <VideoProviders>{children}</VideoProviders>;
-  }
-
-  return <>{children}</>;
-}
 
 function SamplePageContent(props: { sampleId: string }) {
   const { project, sample, isLoading, error, errorStatus } = useSample();
+  const tabs = project && sample ? tabsForProject(project, sample) : [];
+  const panels = panelsOfTabs(tabs);
   useBreadcrumbs(
     project && sample
       ? [
@@ -103,10 +81,35 @@ function SamplePageContent(props: { sampleId: string }) {
   // page growing past the bottom of the window.
   return (
     <div className="flex h-full min-h-0">
-      <SampleTaskProviders>
-        <ToolBar />
-        <SampleView />
-      </SampleTaskProviders>
+      <PanelDataProvider
+        key={sample._id}
+        project={project}
+        sample={sample}
+        panels={panels}
+      >
+        <WorkspaceProvider
+          tabs={tabs}
+          projectId={project._id ?? ""}
+          linkTime={project.layout?.link_time ?? true}
+        >
+          <AnnotationToolProvider>
+            <ToolBar />
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto [&>*]:shrink-0">
+              {project.task === TaskType.MultiPanel ? (
+                <WorkspaceView tabs={tabs} />
+              ) : (
+                panels.map((panel) => (
+                  <PanelFrame key={panel.id} panel={panel} />
+                ))
+              )}
+              {panels.some((panel) =>
+                TIME_PANEL_KINDS.includes(panel.kind),
+              ) && <AnnotationsTable panels={panels} />}
+            </div>
+            <AnnotationToolbar />
+          </AnnotationToolProvider>
+        </WorkspaceProvider>
+      </PanelDataProvider>
     </div>
   );
 }
