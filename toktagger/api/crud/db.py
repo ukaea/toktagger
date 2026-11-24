@@ -27,7 +27,7 @@ CollectionName = typing.Literal[
     "samples",
     "users",
     "project_members",
-    "api_tokens",
+    "bearer_tokens",
     "sessions",
 ]
 
