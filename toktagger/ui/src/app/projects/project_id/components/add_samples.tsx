@@ -142,9 +142,11 @@ export const AddSamplesEditor = ({
             });
             return;
           }
-          const typeProperty = fileTypeSchema.data.properties.type;
+          const fileTypeProperty = fileTypeSchema.data.properties.type;
           const fileTypes =
-            "enum" in typeProperty ? typeProperty.enum : [typeProperty.const];
+            "enum" in fileTypeProperty
+              ? fileTypeProperty.enum
+              : [fileTypeProperty.const];
           setFileTypes(
             fileTypes.map((ft) => ({
               key: ft,
@@ -294,11 +296,10 @@ export const AddSamplesEditor = ({
             } as ShotData,
           };
         } else if (isFileData) {
-          const fileName =
-            shotFileNames.get(shotId) ??
-            (useDirectories
-              ? `${dirPath}/${shotId}`
-              : `${dirPath}/${shotId}.${fileType}`);
+          const fileName = shotFileNames.get(shotId);
+          if (fileName === undefined) {
+            throw new Error(`No file found for shot ${shotId}`);
+          }
 
           const fileData: Record<string, string | string[]> = {
             file_name: fileName,
