@@ -152,8 +152,16 @@ class ManagedCanaille:
         password = auth.canaille_bootstrap_password or secrets.token_urlsafe(12)
         client_secret = secrets.token_urlsafe(32)
         self._cli("install")
-        self._cli("create", "group", "--display-name", auth.admin_group)
-        self.create_user(ADMIN_USERNAME, password, groups=(auth.admin_group,))
+        self.create_user(ADMIN_USERNAME, password)
+        # Canaille 0.4.3+ refuses to create a group with no members.
+        self._cli(
+            "create",
+            "group",
+            "--display-name",
+            auth.admin_group,
+            "--members",
+            ADMIN_USERNAME,
+        )
         self._cli(
             "create",
             "client",
