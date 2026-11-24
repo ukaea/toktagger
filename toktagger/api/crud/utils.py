@@ -196,7 +196,8 @@ async def get_model(
     models = await db_client.get_filtered_documents(
         collection="models",
         filters=filters,
-        sort_by="version",
+        # Versions are numbered per model name, so only creation order identifies the latest model.
+        sort_by="_id",
         sort_direction=-1,
     )
     if not models:

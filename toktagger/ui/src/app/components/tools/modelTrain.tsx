@@ -258,7 +258,7 @@ export function ModelTrainModal({
 
   const stopTrainingJob = async (model: Model) => {
     if (!project._id) return;
-    const response = await stopTraining(project._id, model.type, model.version);
+    const response = await stopTraining(project._id, model.type, model._id);
     if (response.ok) {
       setMessage("Model training cancelled.");
       setMessageIcon(
@@ -323,6 +323,7 @@ export function ModelTrainModal({
                     )}
                     <TextField
                       label="Model Name"
+                      description="A name you choose to identify this trained model later. Versions are numbered per name."
                       isRequired
                       value={modelName}
                       onChange={setModelName}

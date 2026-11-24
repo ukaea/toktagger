@@ -63,7 +63,10 @@ class StumpyMotifPredictParams(pydantic.BaseModel):
     "stumpy_motif", ["time-series"], StumpyMotifTrainParams, StumpyMotifPredictParams
 )
 class StumpyMotifModel(Model):
-    """Template-matching event detector using STUMPY's FFT-based MASS distance profile."""
+    """Template-matching event detector using STUMPY's FFT-based MASS distance profile.
+
+    Requires Time Region annotations (with a start and an end time). The model does not use Time Point annotations. Refer to the "Event Detection Models" documentation.
+    """
 
     def define_model(self) -> dict:
         return {

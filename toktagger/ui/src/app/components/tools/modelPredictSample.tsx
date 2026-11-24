@@ -124,7 +124,7 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
       project_id,
       sample_id,
       selectedModel.type,
-      selectedModel.version,
+      selectedModel._id,
       useGPU,
       params,
       dataParams,

@@ -68,7 +68,10 @@ class DTWMotifPredictParams(pydantic.BaseModel):
     "dtw_motif", ["time-series"], DTWMotifTrainParams, DTWMotifPredictParams
 )
 class DTWMotifModel(Model):
-    """Template-matching event detector using z-normalised Dynamic Time Warping distance."""
+    """Template-matching event detector using z-normalised Dynamic Time Warping distance.
+
+    Requires Time Region annotations (with a start and an end time). The model does not use Time Point annotations. Refer to the "Event Detection Models" documentation.
+    """
 
     def define_model(self) -> dict:
         return {

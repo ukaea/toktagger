@@ -64,7 +64,10 @@ class MiniRocketPredictParams(pydantic.BaseModel):
     "minirocket", ["time-series"], MiniRocketTrainParams, MiniRocketPredictParams
 )
 class MiniRocketModel(Model):
-    """Sliding-window binary event classifier using MiniRocket features and Ridge regression."""
+    """Sliding-window binary event classifier using MiniRocket features and Ridge regression.
+
+    Requires Time Region annotations (with a start and an end time). The model does not use Time Point annotations. Refer to the "Event Detection Models" documentation.
+    """
 
     def define_model(self) -> dict:
         return {

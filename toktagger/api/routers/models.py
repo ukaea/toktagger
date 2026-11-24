@@ -469,6 +469,8 @@ async def start_model_training(
         Whether to use GPU to train the model.
     params : dict
         Optional parameters for training the model.
+    name : str | None
+        A display name for the trained model. Versions are numbered per name.
 
     current_user : UserOut
         The authenticated project annotator/admin, or a global admin.
@@ -616,15 +618,15 @@ async def stop_model_training(
     model_type: str,
     current_user: UserOut = Depends(require_project_annotator),
     _models_enabled: None = Depends(check_models_enabled),
-    version: int | None = Query(
-        None, description="Version of model to use, leave blank for latest version"
+    model_id: str | None = Query(
+        None, description="ID of the model to stop, leave blank for all in progress"
     ),
 ):
     """
     Stop training ML model(s) which are currently in progress, by type and
-    (optionally) version.
-    If version is not specified, stops queued and training models of that type;
-    loading models are included only when explicitly selected by version.
+    (optionally) model ID.
+    If model_id is not specified, stops queued and training models of that type;
+    loading models are included only when explicitly selected by model_id.
 
     Parameters
     ----------
@@ -632,9 +634,9 @@ async def stop_model_training(
         The ID of the project to stop model training for.
     model_type : str
         The type of model to stop training.
-    version : int | None
-        Version of model to use, leave blank to stop all in progress models
-        of the given type.
+    model_id : str | None
+        ID of the model to stop, leave blank to stop all in progress models
+        of the given type. Get it from get_trained_models.
 
     current_user : UserOut
         The authenticated project annotator/admin, or a global admin.
@@ -651,20 +653,19 @@ async def stop_model_training(
         - You need to cancel an ML model training run
         - You need to cancel training of all ML models of a specified type
     Do Not Use When:
-        - An explicitly selected version is not queued/training/loading - returns 409;
-          without a version, no matching jobs returns an empty list
+        - An explicitly selected model is not queued/training/loading - returns 409;
+          without a model_id, no matching jobs returns an empty list
         - You want to delete a model instance - this is not supported by agentic workflows in TokTagger (use delete_models)
     Example User Requests:
         - "Stop training the disruption_cnn model"
-        - "Stop training disruption_cnn model version 3, if it is in progress."
+        - "Stop training my disruption_cnn model named 'baseline', if it is in progress."
     """
     db_client: MongoDBClient = request.app.state.db_client
     task_registry = request.app.state.task_registry
 
-    # If version provided, get only that model
-    if version:
+    if model_id:
         model = await utils.get_model(
-            db_client, project_id, model_type=model_type, version=version
+            db_client, project_id, model_type=model_type, model_id=model_id
         )
         if model.status not in ("queued", "training", "loading"):
             raise HTTPException(
@@ -1100,8 +1101,8 @@ async def predict(
     current_user: UserOut = Depends(require_project_annotator),
     _models_enabled: None = Depends(check_models_enabled),
     model_type: str = Path(description="The type of model to use for predictions."),
-    version: int = Query(
-        None, description="Version of model to use, leave blank for latest version"
+    model_id: str | None = Query(
+        None, description="ID of the model to use, leave blank for the latest model"
     ),
     num_predictions: int = Query(
         20,
@@ -1132,8 +1133,9 @@ async def predict(
         The ID of the project to get models for.
     model_type : str
         The type of model to use for predictions.
-    version : int | None
-        Version of model to use, leave blank for latest version.
+    model_id : str | None
+        ID of the model to use, leave blank for the latest model. Get it from
+        get_trained_models.
     num_predictions : int
         The maximum number of samples to make predictions for, default is 20.
     sample_ids : list[str] | None
@@ -1193,13 +1195,12 @@ async def predict(
             detail=f"This model type is not valid for your current project! Valid types are: {project.model_types}",
         )
 
-    # Find the latest created model for this project
     model = await utils.get_model(
         db_client,
         project_id,
         model_type=model_type,
         status="completed",
-        version=version,
+        model_id=model_id,
     )
     if model.status != "completed":
         raise HTTPException(
@@ -1332,8 +1333,8 @@ async def create_sample_predictions(
     current_user: UserOut = Depends(require_project_annotator),
     _models_enabled: None = Depends(check_models_enabled),
     model_type: str = Path(description="The type of model to make predictions from."),
-    version: int = Query(
-        None, description="Version of model to use, leave blank for latest version"
+    model_id: str | None = Query(
+        None, description="ID of the model to use, leave blank for the latest model"
     ),
     use_gpu: bool = Query(
         False, description="Whether to use GPU to create these predictions"
@@ -1360,6 +1361,9 @@ async def create_sample_predictions(
         The ID of the sample to make model predictions for.
     model_type : str
         The type of model to make predictions from.
+    model_id : str | None
+        ID of the model to use, leave blank for the latest model. Get it from
+        get_trained_models.
     use_gpu : bool
         Whether to use GPU to create these predictions.
     params : dict
@@ -1415,13 +1419,12 @@ async def create_sample_predictions(
             detail=f"This model type is not valid for your current project! Valid types are: {project.model_types}",
         )
 
-    # Find the requested model version, or the latest one for this project
     model = await utils.get_model(
         db_client,
         project_id=project.id,
         model_type=model_type,
         status="completed",
-        version=version,
+        model_id=model_id,
     )
 
     # Get model params model from registry and validate

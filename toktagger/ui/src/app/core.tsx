@@ -571,10 +571,10 @@ export const startTraining = async (
 export const stopTraining = async (
   project_id: string,
   selected_model: string,
-  version: number,
+  model_id: string,
 ): Promise<Response> => {
   const response = await apiFetch(
-    `${BACKEND_API_URL}/projects/${project_id}/models/${selected_model}/train?version=${version}`,
+    `${BACKEND_API_URL}/projects/${project_id}/models/${selected_model}/train?model_id=${model_id}`,
     {
       method: "DELETE",
       headers: {
@@ -588,13 +588,13 @@ export const stopTraining = async (
 export const startPredictions = async (
   project_id: string,
   selected_model: string,
-  version: number,
+  model_id: string,
   num_predictions: number,
   use_gpu: boolean,
   params: Record<string, unknown>,
 ): Promise<Response> => {
   const response = await apiFetch(
-    `${BACKEND_API_URL}/projects/${project_id}/models/${selected_model}/predict?version=${version}&num_predictions=${num_predictions}&use_gpu=${use_gpu}`,
+    `${BACKEND_API_URL}/projects/${project_id}/models/${selected_model}/predict?model_id=${model_id}&num_predictions=${num_predictions}&use_gpu=${use_gpu}`,
     {
       method: "POST",
       headers: {
@@ -610,13 +610,13 @@ export const startSamplePredictions = async (
   project_id: string,
   sample_id: string,
   selected_model: string,
-  version: number,
+  model_id: string,
   use_gpu: boolean,
   params: Record<string, unknown>,
   data_params: DataParams,
 ): Promise<Response> => {
   const response = await apiFetch(
-    `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/models/${selected_model}/predict?version=${version}&use_gpu=${use_gpu}`,
+    `${BACKEND_API_URL}/projects/${project_id}/samples/${sample_id}/models/${selected_model}/predict?model_id=${model_id}&use_gpu=${use_gpu}`,
     {
       method: "POST",
       headers: {

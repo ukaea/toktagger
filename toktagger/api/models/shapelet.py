@@ -70,7 +70,10 @@ class ShapeletPredictParams(pydantic.BaseModel):
     "shapelet_transform", ["time-series"], ShapeletTrainParams, ShapeletPredictParams
 )
 class ShapeletTransformModel(Model):
-    """Sliding-window binary event classifier using Shapelet Transform features."""
+    """Sliding-window binary event classifier using Shapelet Transform features.
+
+    Requires Time Region annotations (with a start and an end time). The model does not use Time Point annotations. Refer to the "Event Detection Models" documentation.
+    """
 
     def define_model(self) -> dict:
         return {

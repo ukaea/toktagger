@@ -165,7 +165,7 @@ export function ModelPredictModal({
     const response = await startPredictions(
       project._id,
       selectedModel.type,
-      selectedModel.version,
+      selectedModel._id,
       numPredictions,
       useGPU,
       params,
@@ -192,7 +192,7 @@ export function ModelPredictModal({
     const response = await stopTraining(
       project._id,
       selectedModel.type,
-      selectedModel.version,
+      selectedModel._id,
     );
 
     if (response.ok) {

@@ -147,11 +147,11 @@ async def test_model_batch_predict_samples(
 
 @pytest.mark.asyncio
 @pytest.mark.models_enabled
-async def test_model_batch_predict_version(
+async def test_model_batch_predict_model_id(
     models_api_client, db_client, setup_model_db
 ):
     response = await models_api_client.post(
-        f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/predict?num_predictions=5&version=1"
+        f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/predict?num_predictions=5&model_id={setup_model_db['model_id_1']}"
     )
 
     await collect_predict_results(models_api_client, response.json()["task_id"])
@@ -176,7 +176,7 @@ async def test_model_predict_missing_weights(
         f"{setup_model_db['model_id_1']}"
     ).joinpath("weights.model").unlink()
     response = await models_api_client.post(
-        f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/predict?num_predictions=5&version=1"
+        f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/predict?num_predictions=5&model_id={setup_model_db['model_id_1']}"
     )
     with pytest.raises(RuntimeError) as e:
         wait_for_results(
@@ -247,11 +247,11 @@ async def test_model_sample_predict(models_api_client, db_client, setup_model_db
 
 @pytest.mark.asyncio
 @pytest.mark.models_enabled
-async def test_model_sample_predict_version(
+async def test_model_sample_predict_model_id(
     models_api_client, db_client, setup_model_db
 ):
     response = await models_api_client.post(
-        f"/projects/{setup_model_db['project_id']}/samples/{setup_model_db['sample_ids'][-1]}/models/mock_disruption_cnn/predict?version=1"
+        f"/projects/{setup_model_db['project_id']}/samples/{setup_model_db['sample_ids'][-1]}/models/mock_disruption_cnn/predict?model_id={setup_model_db['model_id_1']}"
     )
 
     await collect_predict_results(models_api_client, response.json()["task_id"])
@@ -267,6 +267,53 @@ async def test_model_sample_predict_version(
     assert annotations[0]["created_by"] == "model::mock_disruption_cnn"
 
     assert annotations[0]["model_id"] == setup_model_db["model_id_1"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.models_enabled
+async def test_model_sample_predict_same_version_different_name(
+    models_api_client, db_client, setup_model_db
+):
+    """Versions are numbered per name, so a version number alone must not select the model."""
+    renamed_model_id = await db_client.insert(
+        "models",
+        ModelIn(
+            type="mock_disruption_cnn",
+            name="Other Disruption Detector",
+            version=1,
+            status="completed",
+            progress=100,
+            score=70,
+        ),
+        ids={"project_id": ObjectId(setup_model_db["project_id"])},
+    )
+    results_dir = config.settings.models.cache_dir.joinpath(renamed_model_id)
+    results_dir.mkdir(parents=True)
+    results_dir.joinpath("weights.model").write_text("Test Model")
+    sample_url = f"/projects/{setup_model_db['project_id']}/samples/{setup_model_db['sample_ids'][-1]}/models/mock_disruption_cnn/predict"
+
+    for requested_model_id in (setup_model_db["model_id_1"], renamed_model_id):
+        response = await models_api_client.post(
+            f"{sample_url}?model_id={requested_model_id}"
+        )
+        await collect_predict_results(models_api_client, response.json()["task_id"])
+        annotations = await db_client.get_filtered_documents(
+            collection="annotations",
+            filters={"validated": False, "model_id": requested_model_id},
+        )
+        assert len(annotations) == 1
+        assert annotations[0]["label"] == requested_model_id
+
+    # With no model_id, the most recently created model is used, not the highest version number.
+    response = await models_api_client.post(sample_url)
+    await collect_predict_results(models_api_client, response.json()["task_id"])
+    annotations = await db_client.get_filtered_documents(
+        collection="annotations", filters={"validated": False}
+    )
+    assert {annotation["model_id"] for annotation in annotations} == {
+        setup_model_db["model_id_1"],
+        renamed_model_id,
+    }
 
 
 @pytest.mark.asyncio
@@ -814,7 +861,7 @@ async def test_model_stop_training_not_in_progress(
     mock_func, models_api_client, db_client, setup_model_db
 ):
     response = await models_api_client.delete(
-        f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/train?version=1"
+        f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/train?model_id={setup_model_db['model_id_1']}"
     )  # Version 1 model is 'completed' so nothing to do
     assert response.status_code == 409
     assert (
