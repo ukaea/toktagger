@@ -91,6 +91,30 @@ class MongoDBClient:
         result = await self.db[collection].insert_many(documents)
         return [str(object_id) for object_id in result.inserted_ids]
 
+    async def replace_filtered_documents(
+        self,
+        collection: CollectionName,
+        filters: dict,
+        models: list[T],
+        ids: dict[str, ObjectId] | None = None,
+        exclude: set[str] | None = None,
+    ) -> None:
+        """Delete the documents matching the filters and insert the given models.
+
+        Both steps go to the database as one ordered bulk write, so the old
+        documents are only removed once the new ones are ready to replace them.
+        """
+        ids = ids or {}
+        documents = [
+            {**model.model_dump(mode="python", exclude=exclude), **ids}
+            for model in models
+        ]
+
+        operations = [pymongo.DeleteMany(filters)]
+        operations += [pymongo.InsertOne(document) for document in documents]
+
+        await self.db[collection].bulk_write(operations, ordered=True)
+
     async def update(
         self,
         collection: CollectionName,

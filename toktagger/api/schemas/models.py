@@ -9,6 +9,7 @@ from toktagger.api.schemas import ConfiguredModel
 
 class ModelIn(ConfiguredModel):
     type: str
+    name: str | None = None
     version: int
     status: Literal["queued", "training", "loading", "failed", "completed", "aborted"]
     progress: Annotated[float, Field(strict=True, ge=0, le=100)]

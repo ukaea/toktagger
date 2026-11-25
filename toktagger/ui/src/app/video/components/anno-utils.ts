@@ -33,6 +33,7 @@ const CREATOR_PURPOSE = "creator";
 const CREATOR_NAME_PURPOSE = "creator-name";
 const CREATOR_DELETED_PURPOSE = "creator-deleted";
 const DB_ID_PURPOSE = "db-id";
+const MODEL_PURPOSE = "model";
 
 export type PointGeometry = { x: number; y: number };
 
@@ -179,6 +180,16 @@ export function stampDbId(
   return { ...a, bodies: upsertBody(a.bodies, DB_ID_PURPOSE, dbId) };
 }
 
+/** Preserve the id of the model which produced the annotation. */
+export function stampModelId(
+  a: ImageAnnotation,
+  modelId: string | null | undefined,
+): ImageAnnotation {
+  const id = modelId?.trim();
+  if (!id) return a;
+  return { ...a, bodies: upsertBody(a.bodies, MODEL_PURPOSE, id) };
+}
+
 /** Mark a selector as the UI representation of a point. */
 export function stampPoint(a: ImageAnnotation): ImageAnnotation {
   const bodies = upsertBody(a.bodies, POINT_BODY_PURPOSE, POINT_BODY_VALUE);
@@ -213,6 +224,11 @@ export function getAnnotationAuthor(a: ImageAnnotation): CreatedByFields {
 /** Read the backend _id, or null for a shape drawn here and not yet saved. */
 export function getAnnotationDbId(a: ImageAnnotation): string | null {
   return getBodyValue(a, DB_ID_PURPOSE);
+}
+
+/** Read the producing model's id, null when the annotation is not a prediction. */
+export function getAnnotationModelId(a: ImageAnnotation): string | null {
+  return getBodyValue(a, MODEL_PURPOSE);
 }
 
 function newBodyId(): string {
@@ -398,6 +414,7 @@ export function annoToVideoBBox(
     width: Math.round(g.w),
     height: Math.round(g.h),
     created_by: getAnnotationCreator(a),
+    model_id: getAnnotationModelId(a),
   };
 }
 
@@ -427,6 +444,7 @@ export function annoToVideoPolygon(
     label: String(className),
     segmentation: [coordinates],
     created_by: getAnnotationCreator(a),
+    model_id: getAnnotationModelId(a),
   };
 }
 
@@ -450,6 +468,7 @@ export function annoToVideoPoint(
     x: Math.floor(g.x),
     y: Math.floor(g.y),
     created_by: getAnnotationCreator(a),
+    model_id: getAnnotationModelId(a),
   };
 }
 
@@ -504,7 +523,7 @@ export function videoBBoxToAnno(
   };
 
   const labelled = stampLabelAndTrack(anno, b.label, String(b.track_id));
-  return stampDbId(stampCreator(labelled, b), b._id);
+  return stampModelId(stampDbId(stampCreator(labelled, b), b._id), b.model_id);
 }
 
 /** Convert backend VideoPolygon -> Annotorious polygon annotation. */
@@ -559,7 +578,7 @@ export function videoPolygonToAnno(
   };
 
   const labelled = stampLabelAndTrack(anno, p.label, String(p.track_id));
-  return stampDbId(stampCreator(labelled, p), p._id);
+  return stampModelId(stampDbId(stampCreator(labelled, p), p._id), p.model_id);
 }
 
 /** Convert backend VideoPoint -> tagged Annotorious circle marker. */
@@ -605,5 +624,7 @@ export function videoPointToAnno(
   };
 
   const labelled = stampLabelAndTrack(anno, p.label, String(p.track_id));
-  return stampPoint(stampDbId(stampCreator(labelled, p), p._id));
+  return stampPoint(
+    stampModelId(stampDbId(stampCreator(labelled, p), p._id), p.model_id),
+  );
 }

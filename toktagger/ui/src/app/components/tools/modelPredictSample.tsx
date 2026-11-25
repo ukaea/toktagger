@@ -9,9 +9,10 @@ import {
   Switch,
   Button,
 } from "@adobe/react-spectrum";
-import { Annotations, Annotation } from "@/types";
+import { z } from "zod/v4";
+import { Annotations, Annotation, Model, ModelSchema } from "@/types";
 import {
-  getModelTypes,
+  getModels,
   getModelPredictSchema,
   startSamplePredictions,
   getSamplePredictions,
@@ -20,7 +21,6 @@ import { useSample } from "@/app/contexts/SampleContext";
 import ModelForm from "@/app/components/ui/schemaForm";
 import { RJSFSchema } from "@rjsf/utils";
 import Form from "@rjsf/core";
-import { modelCreatedBy } from "@/types";
 
 type ModelPredictInfo = {
   project_id: string;
@@ -29,21 +29,12 @@ type ModelPredictInfo = {
 
 export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
   const { annotations, project, dataParams, setAnnotations } = useSample();
-  const [isEnabled, setIsEnabled] = useState<boolean>(() => {
-    return annotations.some(
-      (ann) =>
-        project?.model_types.some(
-          (t) => ann.created_by === modelCreatedBy(t),
-        ) || false,
-    );
-  });
+  const [userEnabled, setUserEnabled] = useState<boolean | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [taskId, setTaskId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [modelNames, setModelNames] = useState<string[] | null>(null);
-  const [selectedModelName, setSelectedModelName] = useState<string | null>(
-    null,
-  );
+  const [models, setModels] = useState<Model[]>([]);
+  const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
   const [useGPU, setUseGPU] = useState<boolean>(false);
   const [schema, setSchema] = useState<RJSFSchema | null>(null);
   const [unvalidatedFormData, setUnvalidatedFormData] = useState<
@@ -51,46 +42,64 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
   >({});
   const formRef = useRef<Form>(null);
 
-  useEffect(() => {
-    if (!isEnabled || !project) {
-      return;
-    }
-    (async () => {
-      const response = await getModelTypes(project.task);
+  const selectedModel =
+    models.find((model) => model._id === selectedModelId) ?? null;
+  const selectedModelType = selectedModel?.type ?? null;
+  const modelIds = new Set(models.map((model) => model._id));
+  const hasModelPredictions = annotations.some(
+    (annotation) =>
+      annotation.model_id !== null && modelIds.has(annotation.model_id),
+  );
+  // Start out enabled if this sample already has predictions from one of the project's models, until the user touches the switch.
+  const isEnabled = userEnabled ?? hasModelPredictions;
 
-      if (response.ok) {
-        const data = await response.json();
-        const modelTypes = data as string[];
-        setModelNames(modelTypes);
-      } else {
+  // Poll every 5s, so a model trained elsewhere (e.g. the Train Model dialog) shows up here without a page reload.
+  useEffect(() => {
+    const fetchModels = async () => {
+      const response = await getModels(project_id);
+
+      if (!response.ok) {
         const errorMessage = await response.json();
         setMessage(errorMessage.detail);
+        return;
       }
-    })();
-  }, [isEnabled, project]);
+
+      const result = z.array(ModelSchema).safeParse(await response.json());
+      if (!result.success) {
+        setMessage("Could not read the models for this project!");
+        return;
+      }
+
+      // Only a model which finished training can make predictions.
+      setModels(result.data.filter((model) => model.status === "completed"));
+    };
+
+    fetchModels();
+    const interval = setInterval(fetchModels, 5000);
+    return () => clearInterval(interval);
+  }, [project_id]);
 
   useEffect(() => {
     const updateSchema = async () => {
-      if (!selectedModelName) {
+      if (!selectedModelType) {
         setSchema(null);
         return;
       }
       const newSchema: RJSFSchema | null =
-        await getModelPredictSchema(selectedModelName);
+        await getModelPredictSchema(selectedModelType);
       setSchema(newSchema);
     };
     updateSchema();
-  }, [selectedModelName]);
+  }, [selectedModelType]);
 
   const onEnable = (newIsEnabled: boolean) => {
-    setIsEnabled(newIsEnabled);
-    if (!newIsEnabled) {
+    setUserEnabled(newIsEnabled);
+    if (!newIsEnabled && selectedModelId) {
       // Remove previous annotations from this model
       setAnnotations((previousAnnotations: Annotations) => {
         const otherAnnotations = previousAnnotations.filter(
           (annotation: Annotation) =>
-            annotation.created_by !== modelCreatedBy(selectedModelName!) ||
-            annotation.validated,
+            annotation.model_id !== selectedModelId || annotation.validated,
         );
         return otherAnnotations;
       });
@@ -107,14 +116,15 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
   };
 
   const submitPredictJob = async (params: Record<string, unknown>) => {
-    if (!selectedModelName || !project) {
+    if (!selectedModel || !project) {
       return;
     }
 
     const response = await startSamplePredictions(
       project_id,
       sample_id,
-      selectedModelName,
+      selectedModel.type,
+      selectedModel._id,
       useGPU,
       params,
       dataParams,
@@ -131,20 +141,15 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
   };
 
   useEffect(() => {
-    if (!taskId || !selectedModelName || !isEnabled) return;
+    if (!taskId || !selectedModelType || !isEnabled) return;
 
     let pollCounter = 0;
-    // Poll for result from GET predictions endpoint
+    // Poll for result from GET predictions endpoint every 3 seconds; DTW inference can take several seconds so polling faster just spams the server.
     const interval = setInterval(async () => {
-      if (selectedModelName == null) {
-        clearInterval(interval);
-        setIsLoading(false);
-        return;
-      }
       const response = await getSamplePredictions(
         project_id,
         sample_id,
-        selectedModelName,
+        selectedModelType,
         taskId,
       );
       const payload = await response.json();
@@ -152,7 +157,7 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
       if (response.status === 202) {
         // Predictions queued but not done yet, so continue to poll
         pollCounter += 1;
-        if (pollCounter > 30) {
+        if (pollCounter > 20) {
           setMessage("Predictions timed out - try refreshing the page later!");
           clearInterval(interval);
           setIsLoading(false);
@@ -167,16 +172,16 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
                 : [],
             ),
           );
+          // Replace this model's unvalidated predictions rather than appending, so repeated runs don't stack up.
           const otherAnnotations = previousAnnotations.filter(
             (annotation: Annotation) => {
               if (
-                annotation.created_by !== modelCreatedBy(selectedModelName!)
+                annotation.model_id !== selectedModelId ||
+                annotation.validated
               ) {
                 return true;
               }
-              // Video annotations are frame-scoped: only replace this
-              // model's prediction for the frame(s) we just predicted, so
-              // predictions for other frames of the same sample survive.
+              // Video predictions are frame-scoped, so other frames' predictions survive.
               if (
                 "frame" in annotation &&
                 typeof annotation.frame === "number"
@@ -196,12 +201,13 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
         clearInterval(interval);
         setIsLoading(false);
       }
-    }, 1000);
+    }, 3000);
     return () => clearInterval(interval);
   }, [
     project_id,
     sample_id,
-    selectedModelName,
+    selectedModelType,
+    selectedModelId,
     taskId,
     setAnnotations,
     isEnabled,
@@ -219,20 +225,29 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
             Enable Tool
           </Switch>
           <ComboBox
-            label="Select Model Type"
+            label="Select Model"
+            menuWidth="size-3000"
             validationState={message ? "invalid" : undefined}
             errorMessage={message}
-            isDisabled={!isEnabled}
-            selectedKey={selectedModelName}
-            onSelectionChange={(key) =>
-              setSelectedModelName(key !== null ? String(key) : null)
+            description={
+              models.length === 0
+                ? "No trained models yet - train one for this project first."
+                : undefined
             }
+            isDisabled={!isEnabled || models.length === 0}
+            selectedKey={selectedModelId}
+            onSelectionChange={(key) => {
+              setSelectedModelId(key !== null ? String(key) : null);
+              setTaskId(null);
+              setMessage(null);
+              setIsLoading(false);
+            }}
           >
-            {modelNames
-              ? modelNames.map((model_name) => (
-                  <Item key={model_name}>{model_name}</Item>
-                ))
-              : null}
+            {models.map((model) => (
+              <Item
+                key={model._id}
+              >{`${model.name ?? model.type} (v${model.version})`}</Item>
+            ))}
           </ComboBox>
           <ModelForm
             ref={formRef}
@@ -248,7 +263,7 @@ export function ModelPredictTool({ project_id, sample_id }: ModelPredictInfo) {
             <Button
               marginEnd="size-400"
               variant="accent"
-              isDisabled={!isEnabled || !selectedModelName}
+              isDisabled={!isEnabled || !selectedModel}
               onPress={pressSubmit}
             >
               Predict

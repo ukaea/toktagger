@@ -11,13 +11,17 @@ from unittest.mock import patch
 import ray
 from bson import ObjectId
 
-from tests.identity import get_auth_token, session_headers
+import tests.db_definitions as db_definitions
+import tests.models_definitions as models_definitions
 from tests.db_definitions import TEST_ISSUER, USER_ADMIN_ID
+from tests.identity import get_auth_token, session_headers
 from toktagger.api import config
 from toktagger.api.core.sender import send_model_updates
 from toktagger.api.routers import models as models_router
+from toktagger.api.schemas.annotations import TimePointBatch
 from toktagger.api.schemas.users import UserIn
 from toktagger.api.schemas.models import (
+    ModelIn,
     GitlabLoadParams,
     HuggingfaceLoadParams,
     ModelUpdate,
@@ -143,11 +147,11 @@ async def test_model_batch_predict_samples(
 
 @pytest.mark.asyncio
 @pytest.mark.models_enabled
-async def test_model_batch_predict_version(
+async def test_model_batch_predict_model_id(
     models_api_client, db_client, setup_model_db
 ):
     response = await models_api_client.post(
-        f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/predict?num_predictions=5&version=1"
+        f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/predict?num_predictions=5&model_id={setup_model_db['model_id_1']}"
     )
 
     await collect_predict_results(models_api_client, response.json()["task_id"])
@@ -172,7 +176,7 @@ async def test_model_predict_missing_weights(
         f"{setup_model_db['model_id_1']}"
     ).joinpath("weights.model").unlink()
     response = await models_api_client.post(
-        f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/predict?num_predictions=5&version=1"
+        f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/predict?num_predictions=5&model_id={setup_model_db['model_id_1']}"
     )
     with pytest.raises(RuntimeError) as e:
         wait_for_results(
@@ -234,6 +238,134 @@ async def test_model_sample_predict(models_api_client, db_client, setup_model_db
 
     # Check it corresponds to sample ID we asked for predictions on
     assert str(annotations[0]["sample_id"]) == setup_model_db["sample_ids"][-1]
+
+    assert annotations[0]["created_by"] == "model::mock_disruption_cnn"
+
+    # Predictions are identified by the producing model's unique ID
+    assert annotations[0]["model_id"] == setup_model_db["model_id_2"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.models_enabled
+async def test_model_sample_predict_model_id(
+    models_api_client, db_client, setup_model_db
+):
+    response = await models_api_client.post(
+        f"/projects/{setup_model_db['project_id']}/samples/{setup_model_db['sample_ids'][-1]}/models/mock_disruption_cnn/predict?model_id={setup_model_db['model_id_1']}"
+    )
+
+    await collect_predict_results(models_api_client, response.json()["task_id"])
+
+    annotations = await db_client.get_filtered_documents(
+        collection="annotations", filters={"validated": False}
+    )
+    assert len(annotations) == 1
+
+    # Check version 1 of model has been used (annotation label set to model ID in Mock)
+    assert annotations[0]["label"] == setup_model_db["model_id_1"]
+
+    assert annotations[0]["created_by"] == "model::mock_disruption_cnn"
+
+    assert annotations[0]["model_id"] == setup_model_db["model_id_1"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.models_enabled
+async def test_model_sample_predict_same_version_different_name(
+    models_api_client, db_client, setup_model_db
+):
+    """Versions are numbered per name, so a version number alone must not select the model."""
+    renamed_model_id = await db_client.insert(
+        "models",
+        ModelIn(
+            type="mock_disruption_cnn",
+            name="Other Disruption Detector",
+            version=1,
+            status="completed",
+            progress=100,
+            score=70,
+        ),
+        ids={"project_id": ObjectId(setup_model_db["project_id"])},
+    )
+    results_dir = config.settings.models.cache_dir.joinpath(renamed_model_id)
+    results_dir.mkdir(parents=True)
+    results_dir.joinpath("weights.model").write_text("Test Model")
+    sample_url = f"/projects/{setup_model_db['project_id']}/samples/{setup_model_db['sample_ids'][-1]}/models/mock_disruption_cnn/predict"
+
+    for requested_model_id in (setup_model_db["model_id_1"], renamed_model_id):
+        response = await models_api_client.post(
+            f"{sample_url}?model_id={requested_model_id}"
+        )
+        await collect_predict_results(models_api_client, response.json()["task_id"])
+        annotations = await db_client.get_filtered_documents(
+            collection="annotations",
+            filters={"validated": False, "model_id": requested_model_id},
+        )
+        assert len(annotations) == 1
+        assert annotations[0]["label"] == requested_model_id
+
+    # With no model_id, the most recently created model is used, not the highest version number.
+    response = await models_api_client.post(sample_url)
+    await collect_predict_results(models_api_client, response.json()["task_id"])
+    annotations = await db_client.get_filtered_documents(
+        collection="annotations", filters={"validated": False}
+    )
+    assert {annotation["model_id"] for annotation in annotations} == {
+        setup_model_db["model_id_1"],
+        renamed_model_id,
+    }
+
+
+@pytest.mark.asyncio
+@pytest.mark.models_enabled
+async def test_model_sample_predict_keeps_previous_run_until_next_succeeds(
+    models_api_client, db_client, setup_model_db
+):
+    url = f"/projects/{setup_model_db['project_id']}/samples/{setup_model_db['sample_ids'][-1]}/models/mock_disruption_cnn/predict"
+
+    response = await models_api_client.post(url)
+    await collect_predict_results(models_api_client, response.json()["task_id"])
+
+    first_run = await db_client.get_filtered_documents(
+        collection="annotations", filters={"validated": False}
+    )
+    assert len(first_run) == 1
+
+    # Submitting another run leaves the results of the first one in place, so a failure doesn't cost the user the predictions they already had
+    await models_api_client.post(url)
+
+    annotations = await db_client.get_filtered_documents(
+        collection="annotations", filters={"validated": False}
+    )
+    assert [annotation["_id"] for annotation in annotations] == [
+        annotation["_id"] for annotation in first_run
+    ]
+
+
+@pytest.mark.asyncio
+@pytest.mark.models_enabled
+async def test_model_sample_predict_replaces_previous_run(
+    models_api_client, db_client, setup_model_db
+):
+    url = f"/projects/{setup_model_db['project_id']}/samples/{setup_model_db['sample_ids'][-1]}/models/mock_disruption_cnn/predict"
+
+    response = await models_api_client.post(url)
+    await collect_predict_results(models_api_client, response.json()["task_id"])
+
+    first_run = await db_client.get_filtered_documents(
+        collection="annotations", filters={"validated": False}
+    )
+
+    response = await models_api_client.post(url)
+    await collect_predict_results(models_api_client, response.json()["task_id"])
+
+    annotations = await db_client.get_filtered_documents(
+        collection="annotations", filters={"validated": False}
+    )
+
+    # Repeated runs replace rather than stack up
+    assert len(annotations) == 1
+    assert annotations[0]["_id"] != first_run[0]["_id"]
 
 
 @pytest.mark.asyncio
@@ -474,6 +606,76 @@ async def test_model_start_training_no_params(
 
 @pytest.mark.asyncio
 @pytest.mark.models_enabled
+async def test_model_start_training_with_name(
+    models_api_client, db_client, setup_model_db
+):
+    response = await models_api_client.put(
+        f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/train",
+        json={"name": "ELM model"},
+    )
+
+    await collect_train_results(models_api_client, response.json()["task_id"])
+    model_id = response.json()["model_id"]
+
+    model = await db_client.get_document_by_id(
+        collection="models", object_id=ObjectId(model_id)
+    )
+    assert model["name"] == "ELM model"
+
+
+@pytest.mark.asyncio
+@pytest.mark.models_enabled
+async def test_model_start_training_without_name_defaults_to_none(
+    models_api_client, db_client, setup_model_db
+):
+    response = await models_api_client.put(
+        f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/train"
+    )
+
+    await collect_train_results(models_api_client, response.json()["task_id"])
+    model_id = response.json()["model_id"]
+
+    model = await db_client.get_document_by_id(
+        collection="models", object_id=ObjectId(model_id)
+    )
+    assert model["name"] is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.models_enabled
+async def test_model_start_training_version_scoped_by_name(
+    models_api_client, db_client, setup_model_db
+):
+    # setup_model_db already seeds mock_disruption_cnn with an unnamed v1
+    # (MODEL_1) and a v2 named "Latest Disruption Detector" (MODEL_2).
+
+    # A new name for this type should start again at v1, not continue from v2.
+    response = await models_api_client.put(
+        f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/train",
+        json={"name": "Brand New Detector"},
+    )
+    await collect_train_results(models_api_client, response.json()["task_id"])
+    model = await db_client.get_document_by_id(
+        collection="models", object_id=ObjectId(response.json()["model_id"])
+    )
+    assert model["name"] == "Brand New Detector"
+    assert model["version"] == 1
+
+    # Training again with no name should continue from the unnamed v1 (MODEL_1),
+    # unaffected by the named model trained above.
+    response = await models_api_client.put(
+        f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/train"
+    )
+    await collect_train_results(models_api_client, response.json()["task_id"])
+    model = await db_client.get_document_by_id(
+        collection="models", object_id=ObjectId(response.json()["model_id"])
+    )
+    assert model["name"] is None
+    assert model["version"] == 2
+
+
+@pytest.mark.asyncio
+@pytest.mark.models_enabled
 @pytest.mark.parametrize("method", ["train", "predict", "sample"])
 async def test_model_wrong_params(models_api_client, db_client, setup_model_db, method):
     if method == "sample":
@@ -659,7 +861,7 @@ async def test_model_stop_training_not_in_progress(
     mock_func, models_api_client, db_client, setup_model_db
 ):
     response = await models_api_client.delete(
-        f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/train?version=1"
+        f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/train?model_id={setup_model_db['model_id_1']}"
     )  # Version 1 model is 'completed' so nothing to do
     assert response.status_code == 409
     assert (
@@ -675,15 +877,100 @@ async def test_model_stop_training_not_in_progress(
 
 @pytest.mark.asyncio
 @pytest.mark.models_enabled
-async def test_model_delete_predictions(models_api_client, db_client, setup_model_db):
-    await models_api_client.delete(
-        f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/predict"
+async def test_model_delete_predictions(
+    models_api_client, db_client, setup_model_db, setup_model_predictions
+):
+    response = await models_api_client.delete(
+        f"/projects/{setup_model_db['project_id']}/models/disruption_cnn/predict"
     )
 
-    # Should be 5 annotations remaining since half were created by 'manual'
+    assert response.status_code == 200
+
+    # The ten seeded annotations plus the one validated prediction remain
     annotations = await db_client.get_all_documents(collection="annotations")
-    assert len(annotations) == 5
-    assert all(annotation["created_by"] == "manual" for annotation in annotations)
+    assert len(annotations) == 11
+
+    predictions = [
+        annotation
+        for annotation in annotations
+        if annotation.get("model_id") == setup_model_predictions["model_id"]
+    ]
+    assert len(predictions) == 1
+    assert predictions[0]["validated"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.models_enabled
+async def test_model_delete_predictions_keeps_other_model_with_same_name(
+    models_api_client, db_client, setup_model_db
+):
+    project_id = setup_model_db["project_id"]
+    project_obj_id = ObjectId(project_id)
+
+    # Two models of different types which deliberately share one display name
+    shared_name = models_definitions.MODEL_2.name
+    other_model_id = await db_client.insert(
+        "models",
+        ModelIn(
+            type="disruption_cnn",
+            name=shared_name,
+            version=4,
+            status="completed",
+            progress=100,
+            score=70,
+        ),
+        ids={"project_id": project_obj_id},
+    )
+
+    for model_id in (setup_model_db["model_id_2"], other_model_id):
+        await db_client.insert(
+            "annotations",
+            TimePointBatch(
+                shot_id=9980,
+                validated=False,
+                label="Disruption",
+                time=50,
+                created_by="model::disruption_cnn",
+                model_id=model_id,
+            ),
+            ids={
+                "project_id": project_obj_id,
+                "sample_id": ObjectId(setup_model_db["sample_ids"][0]),
+            },
+        )
+
+    await models_api_client.delete(
+        f"/projects/{project_id}/models/disruption_cnn/predict"
+    )
+
+    annotations = await db_client.get_all_documents(collection="annotations")
+    model_ids = [annotation.get("model_id") for annotation in annotations]
+
+    assert other_model_id not in model_ids
+    assert setup_model_db["model_id_2"] in model_ids
+
+
+@pytest.mark.asyncio
+@pytest.mark.models_enabled
+async def test_model_delete_removes_its_predictions(
+    models_api_client, db_client, setup_model_db, setup_model_predictions
+):
+    response = await models_api_client.delete(
+        f"/projects/{setup_model_db['project_id']}/models/disruption_cnn?version=3"
+    )
+
+    assert response.status_code == 200
+
+    annotations = await db_client.get_all_documents(collection="annotations")
+    predictions = [
+        annotation
+        for annotation in annotations
+        if annotation.get("model_id") == setup_model_predictions["model_id"]
+    ]
+
+    # Validated work outlives the model which suggested it
+    assert len(predictions) == 1
+    assert predictions[0]["validated"]
 
 
 @pytest.mark.asyncio
@@ -828,6 +1115,30 @@ async def test_model_load_local_failed(models_api_client, db_client, setup_model
             .joinpath("weights.model")
         )
         assert not model_path.exists()
+
+
+@pytest.mark.asyncio
+@pytest.mark.models_enabled
+async def test_train_no_samples_no_zombie_model(
+    models_api_client, db_client, ray_session
+):
+    """Training with no validated samples must return 404 without leaving a queued model."""
+    project_id = await db_client.insert("projects", db_definitions.PROJECT_2)
+
+    response = await models_api_client.put(
+        f"/projects/{project_id}/models/mock_disruption_cnn/train",
+        json={"params": {}},
+    )
+
+    assert response.status_code == 404
+    assert "No validated samples" in response.json()["detail"]
+
+    # Confirm no model record was written to the DB
+    models = await db_client.get_filtered_documents(
+        collection="models",
+        filters={"status": "queued"},
+    )
+    assert len(models) == 0
 
 
 def mock_ray_remote(*args, **kwargs):

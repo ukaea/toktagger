@@ -1,14 +1,22 @@
+import logging
 import typing
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Query, Request
 
 from toktagger.api import config
-from toktagger.api.auth.dependencies import get_current_user
-from toktagger.api.core.data_loaders import LoaderRegistry
+from toktagger.api.auth.dependencies import get_current_user, get_project_membership
+from toktagger.api.core.data_loaders import DataLoaderError, LoaderRegistry
+from toktagger.api.crud import utils
+from toktagger.api.crud.db import MongoDBClient
 from toktagger.api.models import check_models_enabled, models_dependencies_installed
+from toktagger.api.schemas.data import DataParams
 from toktagger.api.schemas.models import LoadMethods
 from toktagger.api.schemas.annotators import ANNOTATOR_REGISTRY
-from toktagger.api.schemas.projects import Task
+from toktagger.api.schemas.projects import Project, Task
+from toktagger.api.schemas.samples import ShotData, TimeSeriesFileData
+from toktagger.api.schemas.users import UserOut
+
+logger = logging.getLogger(__name__)
 
 if models_dependencies_installed():
     from toktagger.api.models.base import ModelRegistry
@@ -20,6 +28,37 @@ router = APIRouter(
     tags=["Metadata", "MCP"],
     dependencies=[Depends(get_current_user)],
 )
+
+
+async def get_project_signals(db_client: MongoDBClient, project: Project) -> list[str]:
+    """Get the signal names which models in this project can use.
+
+    A sample records its signal names only when the data loader needs them to
+    fetch the data, e.g. for UDA shots. File-based loaders treat them as an
+    optional column filter, so when the sample does not give them, read the
+    names from the data itself.
+    """
+    samples = await utils.get_samples(db_client, project.id, count=1)
+    if not samples:
+        return []
+
+    sample = samples[0]
+    if (
+        isinstance(sample.data, (ShotData, TimeSeriesFileData))
+        and sample.data.signal_names
+    ):
+        return list(sample.data.signal_names)
+
+    data_loader = LoaderRegistry.get(project.data_loader)()
+    try:
+        data = data_loader.get_sample(sample, params=DataParams())
+    except (FileNotFoundError, DataLoaderError, ValueError) as e:
+        logger.warning(f"Could not read the signal names for project {project.id}: {e}")
+        return []
+
+    # Multi-signal responses are keyed by signal name; single-signal ones are not.
+    values = getattr(data, "values", None)
+    return list(values) if isinstance(values, dict) else []
 
 
 @router.get("/dataloader", operation_id="get_dataloaders")
@@ -256,11 +295,60 @@ async def get_model_load_method_allowlist(load_method: LoadMethods) -> str | Non
 
 
 @router.get(
+    "/models/{model}",
+    operation_id="get_model_meta",
+    dependencies=[Depends(check_models_enabled)],
+)
+async def get_model_meta(model: str) -> dict[str, typing.Any]:
+    """
+    Get the metadata (name, description, tasks) for a specific model type.
+
+    Parameters
+    ----------
+    model : str
+        The type of model to get the metadata for.
+
+    Returns
+    -------
+    dict[str, typing.Any]
+        A dict with the model "name", its "description" and the "tasks" it supports.
+
+    Notes
+    -----
+    Requires an active authenticated user (browser session or bearer token).
+
+    Use When:
+        - You need to know what a model type does or which tasks it supports
+        - You need to know which annotations a model type needs before you train it
+    Do Not Use When:
+        - You need the list of model types - use get_model_types instead
+        - You need training parameters - use get_model_training_schema instead
+    Example User Requests:
+        - "What does the minirocket model do?"
+    """
+    description = ModelRegistry.get_description(model)
+    tasks = [t.value for t in ModelRegistry.tasks(model)]
+    return {"name": model, "description": description, "tasks": tasks}
+
+
+@router.get(
     "/models/{model}/train",
     operation_id="get_model_training_schema",
     dependencies=[Depends(check_models_enabled)],
 )
-async def get_model_training_schema(model: str) -> dict[str, typing.Any] | None:
+async def get_model_training_schema(
+    request: Request,
+    model: str,
+    project_id: str | None = Query(
+        None,
+        description=(
+            "If provided, populate any class_label field's dropdown options "
+            "from this project's configured time-region annotation labels, and "
+            "any signal_names field's options from this project's sample signals."
+        ),
+    ),
+    current_user: UserOut = Depends(get_current_user),
+) -> dict[str, typing.Any] | None:
     """
     Get the required training parameter schema for a specific model type.
 
@@ -268,6 +356,8 @@ async def get_model_training_schema(model: str) -> dict[str, typing.Any] | None:
     ----------
     model : str
         The type of model to get the training schema for.
+    project_id : str | None
+        If given, fill the class_label and signal_names options from this project.
 
     Returns
     -------
@@ -288,9 +378,31 @@ async def get_model_training_schema(model: str) -> dict[str, typing.Any] | None:
     Example User Requests:
         - "What parameters do I need to train a disruption CNN model?"
     """
-    return ModelRegistry.get_params_schema(
+    schema = ModelRegistry.get_params_schema(
         model, schema_type="training", return_draft_07=True
     )
+    if not schema or not project_id:
+        return schema
+
+    await get_project_membership(project_id, request, current_user)
+    db_client = request.app.state.db_client
+    properties = schema.get("properties", {})
+    project = await utils.get_project(db_client, project_id)
+
+    if "class_label" in properties:
+        labels = list(project.time_region_labels or [])
+        # Fields with a default (e.g. the optional filter on template-matching models) allow a blank value, so it must stay a valid enum choice; required fields (e.g. minirocket/shapelet) must not offer one.
+        if "class_label" not in schema.get("required", []):
+            labels = [""] + labels
+        properties["class_label"]["enum"] = labels
+
+    if "signal_names" in properties:
+        signals = await get_project_signals(db_client, project)
+        # An empty enum would leave the user unable to fill in a required field, so projects with no readable signals keep the free-text input.
+        if signals:
+            properties["signal_names"]["items"]["enum"] = signals
+
+    return schema
 
 
 @router.get(

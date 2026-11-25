@@ -60,14 +60,14 @@ _prediction_writes: set[asyncio.Task] = set()
 async def _write_predictions(
     db_client: MongoDBClient,
     project_id: str,
-    model_type: str,
+    model: Model,
     samples: list[Sample],
     predict_task: "ray.ObjectRef",
 ) -> None:
     try:
         result = await predict_task
         await utils.store_predictions(
-            db_client, project_id, model_type, samples, result["annotations_batch"]
+            db_client, project_id, model, samples, result["annotations_batch"]
         )
     except Exception:
         logger.exception(f"Failed to store predictions for project {project_id}")
@@ -76,13 +76,13 @@ async def _write_predictions(
 def store_predictions_when_done(
     db_client: MongoDBClient,
     project_id: str,
-    model_type: str,
+    model: Model,
     samples: list[Sample],
     predict_task: "ray.ObjectRef",
 ) -> None:
     """Write a prediction task's results to the database when it finishes, without blocking."""
     write = asyncio.create_task(
-        _write_predictions(db_client, project_id, model_type, samples, predict_task)
+        _write_predictions(db_client, project_id, model, samples, predict_task)
     )
     _prediction_writes.add(write)
     write.add_done_callback(_prediction_writes.discard)
@@ -359,6 +359,14 @@ async def delete_models(
 
     # Delete from DB
     for model in models_to_delete:
+        # Validated annotations are treated as finalized, so they outlive their model.
+        await utils.delete_annotations(
+            db_client,
+            project_id=project_id,
+            model_id=model.id,
+            validated=False,
+        )
+
         await utils.delete_model(
             db_client=db_client, project_id=project_id, model_id=model.id
         )
@@ -438,6 +446,11 @@ async def start_model_training(
     params: dict = Body(
         {}, description="Optional parameters for training the model", embed=True
     ),
+    name: str | None = Body(
+        None,
+        description="User-facing display name for the trained model",
+        embed=True,
+    ),
 ):
     """
     Start training an ML model on validated annotations for a project.
@@ -456,6 +469,8 @@ async def start_model_training(
         Whether to use GPU to train the model.
     params : dict
         Optional parameters for training the model.
+    name : str | None
+        A display name for the trained model. Versions are numbered per name.
 
     current_user : UserOut
         The authenticated project annotator/admin, or a global admin.
@@ -539,14 +554,17 @@ async def start_model_training(
                 detail=f"Training of {model_type} model already in progress!",
             )
 
-        if len(db_models) == 0:
-            # This is the first time a model has been saved for this project, so version = 1
+        # Versioning is scoped to this name, so differently-named models of the same
+        # type each start again at v1 instead of sharing one counter.
+        same_name_models = [db_model for db_model in db_models if db_model.name == name]
+        if len(same_name_models) == 0:
             version = 1
         else:
-            version = db_models[0].version + 1
+            version = same_name_models[0].version + 1
 
         model_in = ModelIn(
             type=model_type,
+            name=name,
             version=version,
             status="queued",
             progress=0,
@@ -600,15 +618,15 @@ async def stop_model_training(
     model_type: str,
     current_user: UserOut = Depends(require_project_annotator),
     _models_enabled: None = Depends(check_models_enabled),
-    version: int | None = Query(
-        None, description="Version of model to use, leave blank for latest version"
+    model_id: str | None = Query(
+        None, description="ID of the model to stop, leave blank for all in progress"
     ),
 ):
     """
     Stop training ML model(s) which are currently in progress, by type and
-    (optionally) version.
-    If version is not specified, stops queued and training models of that type;
-    loading models are included only when explicitly selected by version.
+    (optionally) model ID.
+    If model_id is not specified, stops queued and training models of that type;
+    loading models are included only when explicitly selected by model_id.
 
     Parameters
     ----------
@@ -616,9 +634,9 @@ async def stop_model_training(
         The ID of the project to stop model training for.
     model_type : str
         The type of model to stop training.
-    version : int | None
-        Version of model to use, leave blank to stop all in progress models
-        of the given type.
+    model_id : str | None
+        ID of the model to stop, leave blank to stop all in progress models
+        of the given type. Get it from get_trained_models.
 
     current_user : UserOut
         The authenticated project annotator/admin, or a global admin.
@@ -635,20 +653,19 @@ async def stop_model_training(
         - You need to cancel an ML model training run
         - You need to cancel training of all ML models of a specified type
     Do Not Use When:
-        - An explicitly selected version is not queued/training/loading - returns 409;
-          without a version, no matching jobs returns an empty list
+        - An explicitly selected model is not queued/training/loading - returns 409;
+          without a model_id, no matching jobs returns an empty list
         - You want to delete a model instance - this is not supported by agentic workflows in TokTagger (use delete_models)
     Example User Requests:
         - "Stop training the disruption_cnn model"
-        - "Stop training disruption_cnn model version 3, if it is in progress."
+        - "Stop training my disruption_cnn model named 'baseline', if it is in progress."
     """
     db_client: MongoDBClient = request.app.state.db_client
     task_registry = request.app.state.task_registry
 
-    # If version provided, get only that model
-    if version:
+    if model_id:
         model = await utils.get_model(
-            db_client, project_id, model_type=model_type, version=version
+            db_client, project_id, model_type=model_type, model_id=model_id
         )
         if model.status not in ("queued", "training", "loading"):
             raise HTTPException(
@@ -1084,8 +1101,8 @@ async def predict(
     current_user: UserOut = Depends(require_project_annotator),
     _models_enabled: None = Depends(check_models_enabled),
     model_type: str = Path(description="The type of model to use for predictions."),
-    version: int = Query(
-        None, description="Version of model to use, leave blank for latest version"
+    model_id: str | None = Query(
+        None, description="ID of the model to use, leave blank for the latest model"
     ),
     num_predictions: int = Query(
         20,
@@ -1116,8 +1133,9 @@ async def predict(
         The ID of the project to get models for.
     model_type : str
         The type of model to use for predictions.
-    version : int | None
-        Version of model to use, leave blank for latest version.
+    model_id : str | None
+        ID of the model to use, leave blank for the latest model. Get it from
+        get_trained_models.
     num_predictions : int
         The maximum number of samples to make predictions for, default is 20.
     sample_ids : list[str] | None
@@ -1177,13 +1195,12 @@ async def predict(
             detail=f"This model type is not valid for your current project! Valid types are: {project.model_types}",
         )
 
-    # Find the latest created model for this project
     model = await utils.get_model(
         db_client,
         project_id,
         model_type=model_type,
         status="completed",
-        version=version,
+        model_id=model_id,
     )
     if model.status != "completed":
         raise HTTPException(
@@ -1231,9 +1248,7 @@ async def predict(
         use_gpu=use_gpu,
     )
     task_id = await task_registry.register.remote([predict_task])
-    store_predictions_when_done(
-        db_client, project.id, model.type, samples, predict_task
-    )
+    store_predictions_when_done(db_client, project.id, model, samples, predict_task)
 
     return {"task_id": task_id}
 
@@ -1283,11 +1298,15 @@ async def delete_predictions(
             detail=f"This model type is not valid for your current project! Valid types are: {project.model_types}",
         )
 
+    models = await utils.get_models(db_client, project_id, model_type=model_type)
+    model_ids = [model.id for model in models]
+
     result = await request.app.state.db_client.delete_filtered_documents(
         collection="annotations",
         filters={
             "project_id": ObjectId(project.id),
-            "created_by": f"model::{model_type}",
+            "model_id": {"$in": model_ids},
+            "validated": False,
         },
     )
 
@@ -1314,6 +1333,9 @@ async def create_sample_predictions(
     current_user: UserOut = Depends(require_project_annotator),
     _models_enabled: None = Depends(check_models_enabled),
     model_type: str = Path(description="The type of model to make predictions from."),
+    model_id: str | None = Query(
+        None, description="ID of the model to use, leave blank for the latest model"
+    ),
     use_gpu: bool = Query(
         False, description="Whether to use GPU to create these predictions"
     ),
@@ -1339,6 +1361,9 @@ async def create_sample_predictions(
         The ID of the sample to make model predictions for.
     model_type : str
         The type of model to make predictions from.
+    model_id : str | None
+        ID of the model to use, leave blank for the latest model. Get it from
+        get_trained_models.
     use_gpu : bool
         Whether to use GPU to create these predictions.
     params : dict
@@ -1394,9 +1419,12 @@ async def create_sample_predictions(
             detail=f"This model type is not valid for your current project! Valid types are: {project.model_types}",
         )
 
-    # Find the latest created model for this project
     model = await utils.get_model(
-        db_client, project_id=project.id, model_type=model_type, status="completed"
+        db_client,
+        project_id=project.id,
+        model_type=model_type,
+        status="completed",
+        model_id=model_id,
     )
 
     # Get model params model from registry and validate
@@ -1415,7 +1443,7 @@ async def create_sample_predictions(
         use_gpu=use_gpu,
     )
     task_id = await task_registry.register.remote([task])
-    store_predictions_when_done(db_client, project.id, model.type, [sample], task)
+    store_predictions_when_done(db_client, project.id, model, [sample], task)
 
     return {"task_id": task_id}
 
@@ -1503,6 +1531,7 @@ async def get_sample_predictions(
     try:
         result = await task_registry.get_result.remote(task_id)
     except Exception as e:
+        logger.error(f"Prediction task failed: {e}")
         raise HTTPException(
             detail="Predict task failed - no predictions available",
             status_code=500,

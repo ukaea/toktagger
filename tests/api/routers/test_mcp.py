@@ -45,6 +45,7 @@ async def test_expected_tools(mcp_client):
         "get_model",
         "get_model_load_method_allowlist",
         "get_model_load_methods",
+        "get_model_meta",
         "get_model_prediction_schema",
         "get_model_training_info",
         "get_model_training_schema",

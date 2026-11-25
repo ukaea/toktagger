@@ -308,6 +308,13 @@ class YoloVideoDetectionModel(BaseUltralyticsDetection):
             data_loader=self.data_loader,
         )
 
+    def weights_exist(self, results_dir: Path) -> bool:
+        try:
+            resolve_weights_path(results_dir=results_dir)
+        except FileNotFoundError:
+            return False
+        return True
+
     def load(
         self,
         results_dir: Path,
