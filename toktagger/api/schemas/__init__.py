@@ -1,16 +1,23 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from bson.errors import InvalidId
 from bson.objectid import ObjectId
 from fastapi import HTTPException
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, field_serializer, Field, model_validator
 
 
 class ConfiguredModel(BaseModel):
     timestamp: datetime = Field(
-        default_factory=datetime.now,
+        default_factory=lambda: datetime.now(timezone.utc),
         description="Time when this object was created, leave blank to automatically generate.",
     )
+
+    @field_serializer("timestamp")
+    def serialize_timestamp(self, value: datetime) -> str:
+        """Ensure RFC 3339 compliant date-time format with timezone."""
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=timezone.utc)
+        return value.isoformat()
 
     @model_validator(mode="before")
     def convert_objectid(cls, values):

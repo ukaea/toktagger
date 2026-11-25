@@ -27,7 +27,11 @@ import type { Key } from "@react-types/shared";
 import Delete from "@spectrum-icons/workflow/Delete";
 import { z } from "zod/v4";
 import { BACKEND_API_URL, apiFetch, formatApiDetail } from "@/app/core";
-import { ApiTokenCreatedSchema, ApiTokenSchema, type ApiToken } from "@/types";
+import {
+  BearerTokenCreatedSchema,
+  BearerTokenSchema,
+  type BearerToken,
+} from "@/types";
 
 const TOKENS_URL = `${BACKEND_API_URL}/users/me/tokens`;
 const LIFETIME_OPTIONS = [
@@ -50,19 +54,19 @@ async function readError(res: Response, fallback: string): Promise<Error> {
   return new Error(formatApiDetail(body, fallback));
 }
 
-export default function ApiTokens() {
-  const [tokens, setTokens] = useState<ApiToken[]>([]);
+export default function BearerTokens({ purpose }: { purpose: "api" | "mcp" }) {
+  const [tokens, setTokens] = useState<BearerToken[]>([]);
   const [name, setName] = useState("");
   const [lifetime, setLifetime] = useState<Key>("30");
   const [newToken, setNewToken] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    const res = await apiFetch(TOKENS_URL);
-    if (!res.ok) throw await readError(res, "Failed to load API tokens");
-    const parsed = z.array(ApiTokenSchema).safeParse(await res.json());
-    if (!parsed.success) throw new Error("Unexpected API token list");
+    const res = await apiFetch(`${TOKENS_URL}?purpose=${purpose}`);
+    if (!res.ok) throw await readError(res, "Failed to load tokens");
+    const parsed = z.array(BearerTokenSchema).safeParse(await res.json());
+    if (!parsed.success) throw new Error("Unexpected token list");
     setTokens(parsed.data);
-  }, []);
+  }, [purpose]);
 
   useEffect(() => {
     refresh().catch(showError);
@@ -74,12 +78,13 @@ export default function ApiTokens() {
         method: "POST",
         body: JSON.stringify({
           name: name.trim(),
+          purpose: purpose,
           expires_in_days: Number(lifetime),
         }),
       });
-      if (!res.ok) throw await readError(res, "Failed to create API token");
-      const parsed = ApiTokenCreatedSchema.safeParse(await res.json());
-      if (!parsed.success) throw new Error("Unexpected API token response");
+      if (!res.ok) throw await readError(res, "Failed to create token");
+      const parsed = BearerTokenCreatedSchema.safeParse(await res.json());
+      if (!parsed.success) throw new Error("Unexpected token response");
       setNewToken(parsed.data.token);
       setName("");
       await refresh();
@@ -93,10 +98,10 @@ export default function ApiTokens() {
       const res = await apiFetch(`${TOKENS_URL}/${tokenId}`, {
         method: "DELETE",
       });
-      if (!res.ok) throw await readError(res, "Failed to revoke API token");
+      if (!res.ok) throw await readError(res, "Failed to revoke token");
       close();
       await refresh();
-      ToastQueue.positive("API token revoked", { timeout: 2000 });
+      ToastQueue.positive("Token revoked", { timeout: 2000 });
     } catch (e) {
       showError(e);
     }
@@ -115,14 +120,22 @@ export default function ApiTokens() {
 
   return (
     <Flex direction="column" gap="size-150">
-      <Heading level={2} margin={0}>
-        API tokens
+      <Heading level={1} margin={0}>
+        {purpose.toUpperCase()} Tokens
       </Heading>
-      <Text>
-        Scripts use an API token to call TokTagger as you. Send it in the header{" "}
-        <code>Authorization: Bearer &lt;token&gt;</code>, or set{" "}
-        <code>TOKTAGGER_API_TOKEN</code> for the TokTagger scripts.
-      </Text>
+      {purpose === "api" ? (
+        <Text>
+          Scripts use an API token to call TokTagger as you. Send it in the
+          header <code>Authorization: Bearer &lt;token&gt;</code>, or set{" "}
+          <code>TOKTAGGER_API_TOKEN</code> for the TokTagger scripts.
+        </Text>
+      ) : (
+        <Text>
+          AI agents use an MCP token to call TokTagger as you. Configure your
+          agent's MCP client with the HTTP header{" "}
+          <code>Authorization: Bearer &lt;token&gt;</code>.
+        </Text>
+      )}
 
       {newToken && (
         <InlineAlert variant="positive" width="100%">
@@ -131,14 +144,18 @@ export default function ApiTokens() {
             <Flex direction="column" gap="size-100">
               <Text>TokTagger shows this token one time only.</Text>
               <TextField
-                aria-label="New API token"
+                aria-label={`New ${purpose.toUpperCase()} Token`}
                 value={newToken}
                 isReadOnly
                 width="100%"
-                data-testid="new-api-token"
+                data-testid={`new-${purpose}-token`}
               />
               <Flex gap="size-100">
-                <Button variant="primary" onPress={() => copyToken(newToken)}>
+                <Button
+                  aria-label={`Copy ${purpose.toUpperCase()} Token`}
+                  variant="primary"
+                  onPress={() => copyToken(newToken)}
+                >
                   Copy
                 </Button>
                 <Button variant="secondary" onPress={() => setNewToken(null)}>
@@ -151,7 +168,7 @@ export default function ApiTokens() {
       )}
 
       <Form
-        aria-label="Create API token"
+        aria-label={`Create ${purpose.toUpperCase()} Token`}
         onSubmit={(event) => {
           event.preventDefault();
           createToken();
@@ -182,9 +199,11 @@ export default function ApiTokens() {
       </Form>
 
       <TableView
-        aria-label="API tokens"
+        aria-label={`${purpose.toUpperCase()} Tokens`}
         selectionMode="none"
-        renderEmptyState={() => <Text>You have no API tokens.</Text>}
+        renderEmptyState={() => (
+          <Text>You have no {purpose.toUpperCase()} tokens.</Text>
+        )}
         minHeight="size-2000"
       >
         <TableHeader>
@@ -212,7 +231,7 @@ export default function ApiTokens() {
                   </Button>
                   {(close) => (
                     <Dialog>
-                      <Heading>Revoke API token</Heading>
+                      <Heading>Revoke token</Heading>
                       <Divider />
                       <Content>
                         Revoke <strong>{item.name}</strong>? Scripts that use it
