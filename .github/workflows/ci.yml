@@ -163,7 +163,8 @@ jobs:
         run: uv run --all-extras python -m playwright install --with-deps chromium
 
       - name: Run unit tests
-        timeout-minutes: 15
+        # Each Ray-backed test in test_models.py starts fresh actors, so this suite takes ~15 min on a standard runner.
+        timeout-minutes: 25
         run: uv run --all-extras pytest tests/api
 
       - name: Run end to end tests
