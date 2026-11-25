@@ -1,7 +1,13 @@
 import pytest
 from toktagger.api import config
 from toktagger.api.core.data_loaders import DataLoader, LoaderRegistry
-from toktagger.api.schemas.samples import ShotData
+from toktagger.api.schemas.samples import (
+    DefuseFileData,
+    ImageArrayFileData,
+    ImageFileData,
+    ShotData,
+    TimeSeriesFileData,
+)
 
 
 @pytest.mark.asyncio
@@ -9,20 +15,36 @@ async def test_get_data_loaders(api_client, setup_db):
     response = await api_client.get("/meta/dataloader")
     assert response.status_code == 200
     data = response.json()
-    assert all(item in data for item in ("uda", "image", "tabular", "sal", "fair_mast"))
+    assert all(
+        item in data
+        for item in ("uda", "image", "tabular", "sal", "fair_mast", "defuse")
+    )
 
 
 @pytest.mark.asyncio
-async def test_get_data_schema(api_client, setup_db):
-    response = await api_client.get("/meta/dataloader/uda")
+@pytest.mark.parametrize(
+    "loader, expected_schema",
+    [
+        ("uda", ShotData),
+        ("uda_camera", ShotData),
+        ("sal", ShotData),
+        ("fair_mast", ShotData),
+        ("image", ImageFileData),
+        ("image-array", ImageArrayFileData),
+        ("tabular", TimeSeriesFileData),
+        ("defuse", DefuseFileData),
+    ],
+)
+async def test_get_data_schema(api_client, setup_db, loader, expected_schema):
+    response = await api_client.get(f"/meta/dataloader/{loader}")
     assert response.status_code == 200
     data = response.json()
-    assert data["title"] == "ShotData"
-    assert data == ShotData.model_json_schema()
+    assert data["title"] == expected_schema.__name__
+    assert data == expected_schema.model_json_schema()
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("loader", ["uda", "sal", "fair_mast", "tabular"])
+@pytest.mark.parametrize("loader", ["uda", "sal", "fair_mast", "tabular", "defuse"])
 async def test_get_signal_name_help(api_client, setup_db, loader):
     response = await api_client.get(f"/meta/dataloader/{loader}/help")
     assert response.status_code == 200

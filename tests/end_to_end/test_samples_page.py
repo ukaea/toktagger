@@ -12,6 +12,7 @@ from datetime import datetime
 import pytest
 from playwright.sync_api import Page, expect
 
+from tests.defuse_files import write_defuse_file
 from tests.end_to_end import form_check
 from tests.end_to_end.conftest import login_as
 from tests.endpoints import (
@@ -612,6 +613,60 @@ def test_create_samples_file_data(server_setup, page: Page, file_type: str):
             for sample in samples
         )
         assert sorted(sample["shot_id"] for sample in samples) == [10000, 10001]
+
+
+def test_create_samples_defuse_data(server_setup, page: Page, tmp_path: pathlib.Path):
+    project_id = create_project("Test Project", "time-series", "defuse")
+    shot_files = {
+        shot_id: write_defuse_file(tmp_path / f"MASTUno{shot_id}.h5")
+        for shot_id in (48264, 48265)
+    }
+    tmp_path.joinpath("MASTUno48266.pydet.log").touch()
+    tmp_path.joinpath("notes.h5.txt").touch()
+
+    page.goto(f"http://localhost:8002/ui/projects/{project_id}")
+    check_base_page(page)
+    page.get_by_role("button", name="Add Samples", exact=True).click()
+
+    modal = page.get_by_role("dialog")
+    expect(modal.get_by_role("heading", name="Add Samples to Project")).to_be_visible()
+    expect(modal.get_by_text("DefuseFileData")).to_be_visible()
+
+    # h5 is the only file type, so the dialog selects it without user input
+    expect(modal.get_by_role("combobox", name="File Type")).to_have_value("H5")
+
+    with page.expect_response(
+        lambda response: (
+            "/paths/files" in response.url and str(tmp_path) in response.url
+        )
+    ):
+        modal.get_by_role("textbox", name="Directory Path").fill(str(tmp_path))
+    expect(
+        modal.get_by_text("Found 2 files with shot IDs: 48264, 48265")
+    ).to_be_visible()
+
+    modal.get_by_role("textbox", name="Signal Names").fill("IPLA, ZMAG_v1")
+    with page.expect_response(
+        lambda response: (
+            response.url.endswith(f"/projects/{project_id}/samples")
+            and response.request.method == "POST"
+        )
+    ):
+        modal.get_by_role("button", name="Add Samples").click()
+
+    expect(page.get_by_role("row").nth(1)).to_contain_text("48264")
+    expect(page.get_by_role("row").nth(2)).to_contain_text("48265")
+
+    response = session.get(f"http://localhost:8002/projects/{project_id}/samples")
+    samples = {sample["shot_id"]: sample["data"] for sample in response.json()}
+    assert sorted(samples) == [48264, 48265]
+    for shot_id, file_path in shot_files.items():
+        assert samples[shot_id] == {
+            "file_name": str(file_path),
+            "type": "h5",
+            "protocol": "file",
+            "signal_names": ["IPLA", "ZMAG_v1"],
+        }
 
 
 @pytest.mark.parametrize("file_type", ["PNG", "JPEG"])
