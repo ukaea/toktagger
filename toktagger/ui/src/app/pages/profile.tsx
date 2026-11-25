@@ -1,6 +1,6 @@
 "use client";
 import { Divider, Flex, Heading, Text, View } from "@adobe/react-spectrum";
-import ApiTokens from "@/app/components/ui/apiTokens";
+import BearerTokens from "@/app/components/ui/bearerTokens";
 import { useAuth } from "@/app/contexts/AuthContext";
 import { useBreadcrumbs } from "@/app/contexts/BreadcrumbContext";
 
@@ -66,10 +66,21 @@ export default function ProfilePage() {
         borderColor="dark"
         borderRadius="medium"
         padding="size-300"
-        width="size-10000"
+        width="1100px"
         maxWidth="90%"
       >
-        <ApiTokens />
+        <BearerTokens purpose="api" />
+      </View>
+      <View
+        backgroundColor="gray-100"
+        borderWidth="thin"
+        borderColor="dark"
+        borderRadius="medium"
+        padding="size-300"
+        width="1100px"
+        maxWidth="90%"
+      >
+        <BearerTokens purpose="mcp" />
       </View>
     </Flex>
   );
