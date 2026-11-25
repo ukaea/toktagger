@@ -474,6 +474,7 @@ async def start_model_training(
     Do Not Use When:
         - There are no validated annotations - the endpoint returns 404
         - Training for this model type is already in progress - returns 409
+        - The model type is pretrained (e.g. tokeye) - returns 409, load its weights instead
         - You want to load pre-trained weights instead - use one of the load_model_weights_* tools
         - You need to know which parameters the model needs from the user to train - use get_model_training_schema first
     Example User Requests:
@@ -496,6 +497,12 @@ async def start_model_training(
         raise HTTPException(
             status_code=422,
             detail=f"This model type is not valid for your current project! Valid types are: {project.model_types}",
+        )
+
+    if ModelRegistry.is_pretrained(model_type):
+        raise HTTPException(
+            status_code=409,
+            detail=f"'{model_type}' is a pretrained model and cannot be trained. Load its weights from Hugging Face instead, see the ML models documentation.",
         )
 
     # Get model params model from registry and validate
