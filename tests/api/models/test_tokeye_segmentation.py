@@ -15,14 +15,19 @@ from toktagger.api.schemas.data import (
     Profile2DData,
     TimeSeriesData,
 )
+from toktagger.api.schemas.projects import Project
 from toktagger.api.schemas.samples import Sample, ShotData
+
+pytestmark = pytest.mark.models_enabled
 
 
 class FakeDataLoader:
     def __init__(self, data):
         self.data = data
+        self.calls: list[dict] = []
 
-    def get_sample(self, sample, params):
+    def get_sample(self, sample, params, **kwargs):
+        self.calls.append(kwargs)
         return self.data
 
 
@@ -36,10 +41,23 @@ def make_sample() -> Sample:
     )
 
 
+PROJECT = Project(
+    name="tokeye_project",
+    task="profile-2d",
+    query_strategy="sequential",
+    data_loader="uda",
+    time_min=0.1,
+    time_max=0.6,
+    min_time_step=1e-5,
+    id="project",
+)
+
+
 def make_model(data) -> tokeye_segmentation.TokEyeSegmentation:
     torch.manual_seed(0)
     model = object.__new__(tokeye_segmentation.TokEyeSegmentation)
     model.model = model.define_model()
+    model.project = PROJECT
     model.data_loader = FakeDataLoader(data)
     return model
 
@@ -97,6 +115,9 @@ def test_predict_time_series_returns_polygons_in_data_coordinates(fake_infer):
     predictions = model.predict([make_sample()], params)
 
     assert fake_infer == [(params.n_fft // 2, 1 + len(signal.time) // params.hop)]
+    assert model.data_loader.calls == [
+        {"time_min": 0.1, "time_max": 0.6, "min_time_step": 1e-5}
+    ]
     assert_polygons_inside(predictions, (signal.time[0], signal.time[-1]), (0, 25))
     assert sorted(annotation.label for annotation in predictions[0]) == [
         "coherent",
@@ -162,25 +183,11 @@ def test_save_load_round_trip(tmp_path):
     assert_same_weights(model.model, other.model)
 
 
-def test_train_loads_pretrained_weights(tmp_path, monkeypatch):
-    source = make_model(None)
-    with torch.no_grad():
-        for parameter in source.model.parameters():
-            parameter.add_(1.0)
-    weights_path = tmp_path / "big_tf_unet_251210.pt"
-    torch.save(source.model.state_dict(), weights_path)
-    monkeypatch.setattr(
-        tokeye_segmentation, "download_model", lambda name: weights_path
-    )
-    statuses = []
+def test_train_raises_not_implemented():
     model = make_model(None)
-    model.log_progress = lambda **kwargs: statuses.append(kwargs.get("status"))
 
-    score = model.train([], [])
-
-    assert score == 0.0
-    assert statuses == ["training", "completed"]
-    assert_same_weights(source.model, model.model)
+    with pytest.raises(NotImplementedError, match="Hugging Face"):
+        model.train([], [])
 
 
 def test_tokeye_is_registered_as_pretrained():

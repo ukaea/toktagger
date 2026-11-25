@@ -116,16 +116,7 @@ TokEye gives two scores for each pixel:
 - `coherent`: coherent activity, for example modes.
 - `transient`: transient activity, for example bursts.
 
-TokEye does not train on your annotations. Use one of these procedures to get the pretrained weights:
-
-- **Train**: select `tokeye` in the Train window. TokTagger downloads the weights from Hugging Face. It does not change the weights. The router accepts a train job only when the project has a minimum of one validated sample and one validated annotation.
-- **Load from Hugging Face**: set the user space to `nc1`, the model name to `big_tf_unet` and the file name to `big_tf_unet_251210.pt`. This procedure does not need validated samples. If `load_safetensors_only` is `true`, TokTagger does not load this file, because it is a `.pt` file.
-
-!!! tip
-    If the server cannot connect to the internet, download the weights before you start the server:
-    ```
-    tokeye download big_tf_unet
-    ```
+You cannot train TokEye on your annotations. If you start a train job for `tokeye`, TokTagger refuses it. Load the pretrained weights from Hugging Face instead: set the user space to `nc1`, the model name to `big_tf_unet` and the file name to `big_tf_unet_251210.pt`. If `load_safetensors_only` is `true`, TokTagger does not load this file, because it is a `.pt` file.
 
 The prediction parameters are:
 

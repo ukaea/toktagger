@@ -222,8 +222,10 @@ def test_mask_to_polygons_returns_regions_in_data_coordinates():
     time = np.linspace(1.0, 2.0, 30)
     dim_1 = np.linspace(0.0, 100.0, 20)
 
-    region_polygons = annotators.mask_to_polygons(
-        mask, time=time, dim_1=dim_1, min_size=4, max_polygon_points=10
+    region_polygons = list(
+        annotators.mask_to_polygons(
+            mask, time=time, dim_1=dim_1, min_size=4, max_polygon_points=10
+        )
     )
 
     assert len(region_polygons) == 2

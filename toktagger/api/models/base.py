@@ -394,7 +394,7 @@ class ModelRegistry:
 
     @classmethod
     def is_pretrained(cls, name: str) -> bool:
-        """Return True when training the model needs no validated samples or annotations."""
+        """Return True when the model uses only pretrained weights and cannot be trained."""
         return name in cls._pretrained
 
     @classmethod

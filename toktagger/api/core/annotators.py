@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 from itertools import pairwise
 
 import numpy as np
@@ -156,10 +156,10 @@ def mask_to_polygons(
     dim_1: np.ndarray,
     min_size: int = 0,
     max_polygon_points: int | None = None,
-) -> list[tuple[np.ndarray, Polygon]]:
+) -> Iterator[tuple[np.ndarray, Polygon]]:
     """Convert a (dim_1, time) binary mask into polygons in data coordinates.
 
-    Returns one (region_mask, polygon) pair for each valid contour of each connected region.
+    Yields one (region_mask, polygon) pair for each valid contour of each connected region.
     """
     labeled_regions = measure.label(mask, connectivity=2)
 
@@ -168,7 +168,6 @@ def mask_to_polygons(
             labeled_regions, min_size=min_size
         )
 
-    region_polygons: list[tuple[np.ndarray, Polygon]] = []
     for region_label in range(1, labeled_regions.max() + 1):
         region_mask = labeled_regions == region_label
 
@@ -184,9 +183,7 @@ def mask_to_polygons(
             ]
             poly = Polygon([(time[x], dim_1[y]) for x, y in pixel_coords])
             if poly.is_valid and poly.area > 0:
-                region_polygons.append((region_mask, poly))
-
-    return region_polygons
+                yield region_mask, poly
 
 
 def coords_to_flat_list(coords: Iterable[tuple[float, float]]) -> list[float]:

@@ -474,6 +474,7 @@ async def start_model_training(
     Do Not Use When:
         - There are no validated annotations - the endpoint returns 404
         - Training for this model type is already in progress - returns 409
+        - The model type is pretrained (e.g. tokeye) - returns 409, load its weights instead
         - You want to load pre-trained weights instead - use one of the load_model_weights_* tools
         - You need to know which parameters the model needs from the user to train - use get_model_training_schema first
     Example User Requests:
@@ -498,6 +499,12 @@ async def start_model_training(
             detail=f"This model type is not valid for your current project! Valid types are: {project.model_types}",
         )
 
+    if ModelRegistry.is_pretrained(model_type):
+        raise HTTPException(
+            status_code=409,
+            detail=f"'{model_type}' is a pretrained model and cannot be trained. Load its weights from Hugging Face instead, see the ML models documentation.",
+        )
+
     # Get model params model from registry and validate
     params_validated = validate_model_params(model_type, "training", params)
 
@@ -509,17 +516,15 @@ async def start_model_training(
     logger.info(f"Collected {len(annotations)} annotations.")
     logger.info(f"Collected {len(samples)} samples.")
 
-    if not ModelRegistry.is_pretrained(model_type):
-        if len(samples) == 0:
-            raise HTTPException(
-                status_code=404,
-                detail="No validated samples found to train a model on!",
-            )
-        if len(annotations) == 0:
-            raise HTTPException(
-                status_code=404,
-                detail="No validated annotations found to train a model on!",
-            )
+    if len(samples) == 0:
+        raise HTTPException(
+            status_code=404, detail="No validated samples found to train a model on!"
+        )
+    if len(annotations) == 0:
+        raise HTTPException(
+            status_code=404,
+            detail="No validated annotations found to train a model on!",
+        )
 
     # Held until the queued model is inserted, so a second start sees it and backs off.
     async with db_client.lock(f"models:{project.id}:{model_type}"):

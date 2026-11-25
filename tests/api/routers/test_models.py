@@ -474,6 +474,20 @@ async def test_model_start_training_no_params(
 
 @pytest.mark.asyncio
 @pytest.mark.models_enabled
+async def test_model_start_training_pretrained_rejected(
+    models_api_client, setup_model_db
+):
+    with patch.object(models_router.ModelRegistry, "is_pretrained", return_value=True):
+        response = await models_api_client.put(
+            f"/projects/{setup_model_db['project_id']}/models/mock_disruption_cnn/train"
+        )
+
+    assert response.status_code == 409
+    assert "pretrained" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.models_enabled
 @pytest.mark.parametrize("method", ["train", "predict", "sample"])
 async def test_model_wrong_params(models_api_client, db_client, setup_model_db, method):
     if method == "sample":

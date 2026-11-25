@@ -159,6 +159,9 @@ export function SpectrumCheckboxesWidget(props: WidgetProps) {
 }
 
 export function SpectrumSelectWidget(props: WidgetProps) {
+  if (props.multiple) {
+    return <SpectrumCheckboxesWidget {...props} />;
+  }
   const {
     id,
     label,

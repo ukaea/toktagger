@@ -4,7 +4,6 @@ import typing
 import numpy as np
 import pydantic
 import torch
-from tokeye.hub import download_model
 from tokeye.inference import infer
 from tokeye.models.big_tf_unet.config_big_tf_unet import BigTFUNetConfig
 from tokeye.models.big_tf_unet.model_big_tf_unet import BigTFUNetModel
@@ -32,8 +31,8 @@ class TokEyePredictParams(pydantic.BaseModel):
     signal_name: str = pydantic.Field(
         description="Name of the time-series or 2D profile signal to segment."
     )
-    channels: list[TokEyeChannel] = pydantic.Field(
-        default=["coherent", "transient"],
+    channels: set[TokEyeChannel] = pydantic.Field(
+        default={"coherent", "transient"},
         min_length=1,
         description="TokEye output channels to convert into polygon annotations.",
     )
@@ -106,14 +105,10 @@ class TokEyeSegmentation(Model):
         annotations: list[list[Annotation]],
         params: pydantic.BaseModel | None = None,
     ) -> float:
-        """Download the pretrained TokEye weights. TokEye does not support training in TokTagger."""
-        self.log_progress(status="training", progress=0)
-        weights_path = download_model("big_tf_unet")
-        self.model.load_state_dict(
-            torch.load(weights_path, map_location="cpu", weights_only=True)
+        raise NotImplementedError(
+            "TokEye has pretrained weights. Load them from Hugging Face instead, "
+            "see the TokEye section of the ML models documentation."
         )
-        self.log_progress(status="completed", progress=100)
-        return 0.0
 
     def predict(
         self,
@@ -127,7 +122,13 @@ class TokEyeSegmentation(Model):
         self.model.eval()
         predictions: list[list[AnnotationBase]] = []
         for sample in samples:
-            sample_data = self.data_loader.get_sample(sample, DataParams())
+            sample_data = self.data_loader.get_sample(
+                sample,
+                DataParams(),
+                time_min=self.project.time_min,
+                time_max=self.project.time_max,
+                min_time_step=self.project.min_time_step,
+            )
             signal = (
                 sample_data.values.get(params.signal_name)
                 if isinstance(
@@ -144,8 +145,10 @@ class TokEyeSegmentation(Model):
             scores = infer(self.model, spectrogram, device=params.device)
 
             sample_predictions: list[AnnotationBase] = []
-            for channel in params.channels:
-                channel_scores = scores[TOKEYE_CHANNELS.index(channel)]
+            for channel_index, channel in enumerate(TOKEYE_CHANNELS):
+                if channel not in params.channels:
+                    continue
+                channel_scores = scores[channel_index]
                 region_polygons = mask_to_polygons(
                     channel_scores > params.threshold,
                     time=time,
