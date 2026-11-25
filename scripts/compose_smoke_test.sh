@@ -10,7 +10,7 @@ export MODELS_MAX_ACTORS=2
 # MongoDB 8.x exits on runner kernels 6.19 to 7.0.13 (SERVER-125742); 7.0 runs on them
 export MONGO_VERSION=7.0
 project=toktagger-smoke
-compose=(docker compose -p "$project")
+compose=(docker compose -p "$project" -f docker-compose.yml -f docker-compose.keycloak.yml)
 resolve=(--resolve localhost:443:127.0.0.1 --resolve keycloak.localhost:443:127.0.0.1)
 
 cleanup() { "${compose[@]}" down -v --remove-orphans >/dev/null 2>&1; }
