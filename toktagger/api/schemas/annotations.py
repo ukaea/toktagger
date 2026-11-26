@@ -144,8 +144,9 @@ class AnnotationOut(AnnotationBatch):
 
 
 def create_combined_model(combine_class, base_class, name_suffix="Out"):
-    """Create an Out variant of an annotation class by combining it with AnnotationOut."""
+    """Create a variant of an annotation class by combining it with base_class, and appending the suffix."""
     class_name = f"{base_class.__name__}{name_suffix}"
+    # Fields coming from DB should override those from annotation input class
     return create_model(
         class_name,
         __base__=(combine_class, base_class),
