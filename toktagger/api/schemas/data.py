@@ -7,6 +7,7 @@ from PIL import Image
 from pydantic import BaseModel
 import numpy
 
+
 from toktagger.api.schemas import ConfiguredModel
 
 
@@ -231,7 +232,10 @@ class ImageData(Data):
     values: str | list[int]  # Base64-encoded string or raw encoded file bytes
 
     def to_processed(self) -> numpy.ndarray:
-        """Preserve Pillow mode/dtype (e.g. LA, CMYK, bool, uint16); expand palettes to RGBA."""
+        """Decoded pixel array, preserving Pillow dtype (e.g. LA, CMYK, etc).
+        Shapes: (H, W) grayscale, (H, W, 3) RGB, (H, W, 4) RGBA.
+        Palettes are expanded to RGBA.
+        """
         try:
             raw = (
                 base64.b64decode(self.values)
