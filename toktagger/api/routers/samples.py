@@ -22,6 +22,7 @@ from toktagger.api.schemas.samples import (
     SampleIn,
     SampleSummary,
     SampleUpdateBatchItem,
+    SampleWithAnnotationCount,
 )
 from toktagger.api.schemas.users import UserOut
 
@@ -38,7 +39,7 @@ router = APIRouter(
     "",
     operation_id="get_samples",
     tags=["MCP"],
-    response_model=list[Sample],
+    response_model=list[SampleWithAnnotationCount],
     responses={
         200: {"description": "Samples have been retrieved successfully."},
         404: {"description": "Project not found with that ID."},
@@ -67,7 +68,7 @@ async def get_samples(
     shot_id: int | None = Query(
         None, description="The shot ID to search for, by default None"
     ),
-) -> list[Sample]:
+) -> list[SampleWithAnnotationCount]:
     """
     Get the full list of samples available for this project, with optional
     pagination, sorting, and shot ID filtering.
@@ -94,8 +95,8 @@ async def get_samples(
 
     Returns
     -------
-    list[Sample]
-        A list of Sample objects.
+    list[SampleWithAnnotationCount]
+        A list of Sample objects, each with its annotation count.
 
     Notes
     -----
@@ -113,7 +114,7 @@ async def get_samples(
         - "What is the sample ID for shot 30421?"
     """
     db_client: MongoDBClient = request.app.state.db_client
-    samples = await utils.get_samples(
+    return await utils.get_samples_with_annotation_counts(
         db_client=db_client,
         project_id=project_id,
         shot_id=shot_id,
@@ -122,7 +123,6 @@ async def get_samples(
         start=start,
         count=count,
     )
-    return samples
 
 
 @router.post(
@@ -407,12 +407,18 @@ async def get_next_sample(
     # And the /annotation endpoint to get initial prediction (if available)
     db_client: MongoDBClient = request.app.state.db_client
     project = await utils.get_project(db_client, project_id)
-    samples = await utils.get_samples(
+    samples_with_counts = await utils.get_samples_with_annotation_counts(
         db_client,
         project_id,
         sort_by=sort_by,
         sort_direction=sort_direction,
     )
+    samples = [
+        Sample.model_validate(
+            sample.model_dump(by_alias=True, exclude={"annotation_count"})
+        )
+        for sample in samples_with_counts
+    ]
     annotations = await utils.get_annotations(db_client, project_id)
     query_strategy = QUERY_STRATEGIES[project.query_strategy](samples, annotations)
 

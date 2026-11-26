@@ -1,13 +1,18 @@
 "use client";
 import type { SortDescriptor } from "@react-types/shared";
 import { z } from "zod/v4";
-import { AnnotationConflictSchema, ProjectMemberSchema } from "@/types";
+import {
+  AnnotationConflictSchema,
+  ProjectMemberSchema,
+  SampleWithAnnotationCountSchema,
+} from "@/types";
 import type {
   Project,
   ProjectMember,
   Sample,
   SamplesSummary,
   SampleUpdate,
+  SampleWithAnnotationCount,
   Annotation,
   DataParams,
   GitlabLoadForm,
@@ -158,7 +163,7 @@ export const getSamples = async (
   page: number,
   samplesPerPage: number,
   shotId: string,
-): Promise<Sample[]> => {
+): Promise<SampleWithAnnotationCount[]> => {
   const params = new URLSearchParams();
   params.append("sort_by", sortDescriptor.column.toString());
   params.append("sort_direction", sortDescriptor.direction);
@@ -172,8 +177,11 @@ export const getSamples = async (
   const url = `${BACKEND_API_URL}/projects/${project_id}/samples?${params.toString()}`;
   const response = await ensureOk(await apiFetch(url));
   const data = await response.json();
-  const samples = data as Sample[];
-  return samples;
+  const parsed = z.array(SampleWithAnnotationCountSchema).safeParse(data);
+  if (!parsed.success) {
+    throw new Error("Received malformed sample data from the server.");
+  }
+  return parsed.data;
 };
 
 export const getNextSample = async (

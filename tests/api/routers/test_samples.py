@@ -1,6 +1,8 @@
 import pytest
 from bson.objectid import ObjectId
 
+from tests.db_definitions import SAMPLE_3
+
 
 @pytest.mark.asyncio
 async def test_get_all_samples(api_client, setup_db):
@@ -415,3 +417,80 @@ async def test_delete_all_samples(api_client, setup_db, db_client):
     projects = await db_client.get_all_documents("projects")
     assert len(projects) == 3
     assert setup_db["project_id_1"] in [str(project.get("_id")) for project in projects]
+
+
+@pytest.mark.asyncio
+async def test_get_samples_annotation_count(api_client, setup_db):
+    response = await api_client.get(f"/projects/{setup_db['project_id_1']}/samples")
+    assert response.status_code == 200
+    counts = {sample["_id"]: sample["annotation_count"] for sample in response.json()}
+    assert counts[setup_db["sample_id_1"]] == 3
+    assert counts[setup_db["sample_id_2"]] == 1
+    assert all(
+        count == 0
+        for sample_id, count in counts.items()
+        if sample_id not in (setup_db["sample_id_1"], setup_db["sample_id_2"])
+    )
+
+
+async def _add_unannotated_sample(db_client, project_id: str) -> str:
+    return await db_client.insert(
+        "samples",
+        SAMPLE_3,
+        ids={"project_id": ObjectId(project_id)},
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("sort_direction", "expected_order"),
+    [
+        ("ascending", ["unannotated", "sample_id_2", "sample_id_1"]),
+        ("descending", ["sample_id_1", "sample_id_2", "unannotated"]),
+    ],
+)
+async def test_get_samples_sort_by_annotation_count(
+    api_client, db_client, setup_db, sort_direction, expected_order
+):
+    ids = {
+        **setup_db,
+        "unannotated": await _add_unannotated_sample(
+            db_client, setup_db["project_id_1"]
+        ),
+    }
+    response = await api_client.get(
+        f"/projects/{setup_db['project_id_1']}/samples"
+        f"?sort_by=annotation_count&sort_direction={sort_direction}"
+    )
+    assert response.status_code == 200
+    returned_samples = response.json()
+    assert [sample["_id"] for sample in returned_samples] == [
+        ids[key] for key in expected_order
+    ]
+    assert [sample["annotation_count"] for sample in returned_samples] == sorted(
+        [0, 1, 3], reverse=sort_direction == "descending"
+    )
+
+
+@pytest.mark.asyncio
+async def test_get_samples_sort_by_annotation_count_paginated(
+    api_client, db_client, setup_db
+):
+    await _add_unannotated_sample(db_client, setup_db["project_id_1"])
+    response = await api_client.get(
+        f"/projects/{setup_db['project_id_1']}/samples"
+        "?sort_by=annotation_count&sort_direction=ascending&start=1&count=1"
+    )
+    assert response.status_code == 200
+    assert [sample["_id"] for sample in response.json()] == [setup_db["sample_id_2"]]
+
+
+@pytest.mark.asyncio
+async def test_get_next_sample_sort_by_annotation_count(api_client, setup_db):
+    response = await api_client.post(
+        f"/projects/{setup_db['project_id_1']}/samples/next"
+        "?sort_by=annotation_count&sort_direction=descending",
+        json=[setup_db["sample_id_1"]],
+    )
+    assert response.status_code == 200
+    assert response.json()["_id"] == setup_db["sample_id_2"]
