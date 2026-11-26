@@ -84,6 +84,25 @@ def test_headers_are_passed(toktagger_client, setup_db):
     )
 
 
+def test_close_closes_client(toktagger_client):
+    assert not toktagger_client._http.is_closed
+    assert toktagger_client.health()["db_connected"] is True
+
+    toktagger_client.close()
+
+    assert toktagger_client._http.is_closed
+    toktagger_client.close()
+    assert toktagger_client._http.is_closed
+
+
+def test_context_manager_closes_client_on_error(toktagger_client):
+    with pytest.raises(ValueError, match="example error"):
+        with toktagger_client:
+            raise ValueError("example error")
+
+    assert toktagger_client._http.is_closed
+
+
 def test_context_manager_closes_client(toktagger_client):
     with toktagger_client:
         assert not toktagger_client._http.is_closed

@@ -50,6 +50,8 @@ class TokTaggerClient:
             project = client.get_project_by_name("MST example")
             samples = client.list_samples(project.id, count=100)
 
+    Alternatively, call close() when finished using the client without a with block.
+
     You can also chain together requests on the returned Project / Sample objects,
     without having to provide the ID:
 
@@ -112,6 +114,10 @@ class TokTaggerClient:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Close the underlying HTTP connection, ignoring any in-flight error."""
+        self.close()
+
+    def close(self) -> None:
+        """Close the underlying HTTP connection; safe to call more than once."""
         self._http.close()
 
     def health(self) -> dict[str, Any]:
@@ -256,7 +262,7 @@ class TokTaggerClient:
         if len(exact_matches) > 1:
             raise MultipleResultsFoundError(
                 f"{len(exact_matches)} projects matched name '{name}'; "
-                f"use list_projects(name={name}) to see all projects matching this name,"
+                f"use list_projects(name={name}) to see all projects matching this name, "
                 "or use get_project() with a specific project ID."
             )
         return exact_matches[0]
@@ -379,7 +385,7 @@ class TokTaggerClient:
         if len(samples) > 1:
             raise MultipleResultsFoundError(
                 f"{len(samples)} samples matched shot ID {shot_id} in project "
-                f"{project_id}; use list_samples() to see all samples matching this shot ID,"
+                f"{project_id}; use list_samples() to see all samples matching this shot ID, "
                 f"or use get_sample() with a specific sample ID."
             )
         return samples[0]

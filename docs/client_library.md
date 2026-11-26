@@ -32,7 +32,17 @@ with TokTaggerClient("http://localhost:8002") as client:
         print(sample.shot_id)
 ```
 
-Use the client as a context manager so the underlying HTTP connection is closed when the `with` block exits. If your server runs elsewhere, pass the address as `base_url` (a per-request `timeout` in seconds can also be set).
+Use the client as a context manager so the underlying HTTP connection is closed when the `with` block exits. Alternatively, call `close()` explicitly when finished; repeated calls are safe:
+
+```python
+client = TokTaggerClient("http://localhost:8002")
+try:
+    project = client.get_project_by_name("MST example")
+finally:
+    client.close()
+```
+
+If your server runs elsewhere, pass the address as `base_url` (a per-request `timeout` in seconds can also be set).
 
 Every project, sample and annotation returned by the client has the client bound to it, so you can chain operations without passing IDs around:
 
