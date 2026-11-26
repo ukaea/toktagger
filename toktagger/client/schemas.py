@@ -30,7 +30,6 @@ from toktagger.api.schemas.views import ViewParamTypes, ViewParams
 
 from toktagger.client.exceptions import TokTaggerClientError
 
-# Parse the heterogeneous data responses into their concrete types
 if TYPE_CHECKING:
     from toktagger.client.client import TokTaggerClient
 

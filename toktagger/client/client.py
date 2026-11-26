@@ -571,7 +571,7 @@ class TokTaggerClient:
         self,
         method: str,
         path: str,
-        params: dict[str, object] | None = None,
+        params: dict[str, Any] | None = None,
         json: dict | list | None = None,
     ) -> httpx.Response:
         try:

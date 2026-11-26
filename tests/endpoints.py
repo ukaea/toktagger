@@ -123,9 +123,7 @@ def create_local_samples(
     return response.json()
 
 
-def create_annotations(
-    project_id: str, sample_id: str, annotations: list[dict]
-) -> None:
+def create_annotations(project_id: str, sample_id: str, annotations: list[dict]):
     """Overwrite the annotations on a sample (as the UI's PUT endpoint does)."""
     response = session.put(
         f"http://localhost:8002/projects/{project_id}/samples/{sample_id}/annotations",
