@@ -231,7 +231,7 @@ class ImageData(Data):
     values: str | list[int]  # Base64-encoded string or raw encoded file bytes
 
     def to_processed(self) -> numpy.ndarray:
-        """Decoded pixel array: (H, W) grayscale, (H, W, 3) RGB, (H, W, 4) RGBA."""
+        """Preserve Pillow mode/dtype (e.g. LA, CMYK, bool, uint16); expand palettes to RGBA."""
         try:
             raw = (
                 base64.b64decode(self.values)
