@@ -110,7 +110,7 @@ class Project(ProjectSchema):
         self,
         shot_id: int | None = None,
         start: int = 0,
-        count: int = 100,
+        count: int | None = None,
         sort_by: str = "_id",
         sort_direction: Literal["ascending", "descending"] = "descending",
     ) -> list[Sample]:
@@ -122,8 +122,8 @@ class Project(ProjectSchema):
             If provided, only return samples with this shot ID.
         start : int
             Number of matching samples to skip (pagination offset), by default 0
-        count : int, default: 100
-            Maximum number of samples to return, by default 100
+        count : int | None, default: None
+            Maximum number of samples to return; None returns all matching results.
         sort_by : str
             Field to sort the results by, by default '_id'
         sort_direction : Literal["ascending", "descending"]
@@ -225,7 +225,7 @@ class Project(ProjectSchema):
         self,
         validated: bool | None = None,
         start: int = 0,
-        count: int = 100,
+        count: int | None = None,
         sort_by: str = "_id",
         sort_direction: Literal["ascending", "descending"] = "descending",
     ) -> list[AnnotationOutTypes]:
@@ -237,8 +237,8 @@ class Project(ProjectSchema):
             If provided, only return annotations with this validation status.
         start : int
             Number of matching annotations to skip (pagination offset), by default 0
-        count : int, default: 100
-            Maximum number of annotations to return, by default 100
+        count : int | None, default: None
+            Maximum number of annotations to return; None returns all matching results.
         sort_by : str
             Field to sort the results by ('_id' is equivalent to timestamp),
             by default '_id'
@@ -370,7 +370,7 @@ class Sample(SampleSchema):
         self,
         validated: bool | None = None,
         start: int = 0,
-        count: int = 100,
+        count: int | None = None,
         sort_by: str = "_id",
         sort_direction: Literal["ascending", "descending"] = "descending",
     ) -> list[AnnotationOutTypes]:
@@ -382,8 +382,8 @@ class Sample(SampleSchema):
             If provided, only return annotations with this validation status.
         start : int
             Number of matching annotations to skip (pagination offset), by default 0
-        count : int, default: 100
-            Maximum number of annotations to return, by default 100
+        count : int | None, default: None
+            Maximum number of annotations to return; None returns all matching results.
         sort_by : str
             Field to sort the results by ('_id' is equivalent to timestamp),
             by default '_id'

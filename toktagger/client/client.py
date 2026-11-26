@@ -136,7 +136,7 @@ class TokTaggerClient:
         self,
         name: str | None = None,
         start: int = 0,
-        count: int = 100,
+        count: int | None = None,
         sort_by: str = "_id",
         sort_direction: Literal["ascending", "descending"] = "descending",
     ) -> list[Project]:
@@ -148,8 +148,8 @@ class TokTaggerClient:
             If provided, only return projects whose name contains this value.
         start : int
             Number of matching projects to skip (pagination offset), by default: 0
-        count : int
-            Maximum number of projects to return, by default: 100
+        count : int | None, default: None
+            Maximum number of projects to return; None returns all matching results.
         sort_by : str
             Field to sort the results by, by default: "_id"
         sort_direction : Literal["ascending", "descending"]
@@ -188,10 +188,11 @@ class TokTaggerClient:
         """
         params = {
             "start": start,
-            "count": count,
             "sort_by": sort_by,
             "sort_direction": sort_direction,
         }
+        if count is not None:
+            params["count"] = count
         if name is not None:
             params["name"] = name
 
@@ -264,7 +265,7 @@ class TokTaggerClient:
         project_id: str,
         shot_id: int | None = None,
         start: int = 0,
-        count: int = 100,
+        count: int | None = None,
         sort_by: str = "_id",
         sort_direction: Literal["ascending", "descending"] = "descending",
     ) -> list[Sample]:
@@ -278,8 +279,8 @@ class TokTaggerClient:
             If provided, only return samples with this shot ID.
         start : int, default: 0
             Number of matching samples to skip (pagination offset).
-        count : int, default: 100
-            Maximum number of samples to return.
+        count : int | None, default: None
+            Maximum number of samples to return; None returns all matching results.
         sort_by : str, default: ``"_id"``
             Field to sort the results by.
         sort_direction : {"ascending", "descending"}, default: ``"descending"``
@@ -300,10 +301,11 @@ class TokTaggerClient:
         """
         params = {
             "start": start,
-            "count": count,
             "sort_by": sort_by,
             "sort_direction": sort_direction,
         }
+        if count is not None:
+            params["count"] = count
         if shot_id is not None:
             params["shot_id"] = shot_id
         data = self._request(
@@ -503,7 +505,7 @@ class TokTaggerClient:
         sample_id: str | None = None,
         validated: bool | None = None,
         start: int = 0,
-        count: int = 100,
+        count: int | None = None,
         sort_by: str = "_id",
         sort_direction: Literal["ascending", "descending"] = "descending",
     ) -> list[AnnotationOutTypes]:
@@ -519,8 +521,8 @@ class TokTaggerClient:
             If provided, only return annotations with this validation status.
         start : int, default: 0
             Number of matching annotations to skip (pagination offset).
-        count : int, default: 100
-            Maximum number of annotations to return.
+        count : int | None, default: None
+            Maximum number of annotations to return; None returns all matching results.
         sort_by : str, default: ``"_id"``
             Field to sort the results by (``"_id"`` is equivalent to timestamp).
         sort_direction : {"ascending", "descending"}, default: ``"descending"``
@@ -542,10 +544,11 @@ class TokTaggerClient:
         """
         params = {
             "start": start,
-            "count": count,
             "sort_by": sort_by,
             "sort_direction": sort_direction,
         }
+        if count is not None:
+            params["count"] = count
         if validated is not None:
             params["validated"] = validated
 

@@ -56,7 +56,7 @@ annotations = client.list_annotations(project.id, sample_id=sample.id)
 
 | Method | Description |
 |---|---|
-| `client.list_projects(name=None, start=0, count=100, ...)` | List projects; `name` filters by case-insensitive substring |
+| `client.list_projects(name=None, start=0, count=None, ...)` | List projects; `name` filters by case-insensitive substring |
 | `client.get_project(project_id)` | Fetch one project by ID |
 | `client.get_project_by_name(name)` | Fetch the project with this name; raises `NotFoundError` if nothing matches and `MultipleResultsFoundError` if several do (name is a substring match, so several projects can match) |
 | `client.list_samples(project_id, shot_id=None, ...)` | List a project's samples, optionally filtered by shot ID |
@@ -64,7 +64,7 @@ annotations = client.list_annotations(project.id, sample_id=sample.id)
 | `client.get_sample_by_shot_id(project_id, shot_id)` | Fetch the sample with this shot ID; raises if zero or several samples match |
 | `client.get_samples_summary(project_id)` | Aggregated statistics over the project's samples (e.g. counts per annotation type) |
 
-The list methods support pagination with `start` (results to skip) and `count` (max results, default 100), and sorting with `sort_by` / `sort_direction` (default: most recent first).
+The list methods support pagination with `start` (results to skip) and `count` (max results; `None` by default, returning all matching results), and sorting with `sort_by` / `sort_direction` (default: most recent first).
 
 ## Fetching Sample Data
 
