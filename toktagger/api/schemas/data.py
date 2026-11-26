@@ -1,15 +1,12 @@
 import base64
 import io
-from typing import Literal, NoReturn, Union
-
-import numpy as np
+from typing import Literal, Union
 import pandas as pd
 import xarray as xr
 from PIL import Image
-
 from pydantic import BaseModel
-
 import numpy
+
 
 from toktagger.api.schemas import ConfiguredModel
 
@@ -75,7 +72,7 @@ class MultiVariateProfile2DDataSummary(DataSummary):
 
 
 class Data(BaseModel):
-    def to_processed(self) -> NoReturn:
+    def to_processed(self) -> pd.DataFrame | numpy.ndarray | xr.Dataset:
         """Bare Data carries no payload to convert."""
         raise ValueError("The bare Data type carries no payload to convert.")
 
@@ -148,17 +145,17 @@ class Profile2DData(Data):
         # Loaders emit values as (time, dim_1) but Profile2DView emits the
         # transposed (dim_1, time) layout, so the axis order is inferred from
         # the coordinate lengths; square profiles assume the loader layout.
-        values = np.asarray(self.values, dtype=float)
-        time = np.asarray(self.time, dtype=float)
-        dim_1 = np.asarray(self.dim_1, dtype=float)
+        values = numpy.asarray(self.values, dtype=float)
+        time = numpy.asarray(self.time, dtype=float)
+        dim_1 = numpy.asarray(self.dim_1, dtype=float)
         if values.ndim != 2:
             raise ValueError(f"Profile values must be 2D, got shape {values.shape}.")
-        if values.shape[0] != len(time):
-            if values.shape[0] != len(dim_1):
+        if values.shape != (len(time), len(dim_1)):
+            if values.shape != (len(dim_1), len(time)):
                 raise ValueError(
-                    f"Profile values shape {values.shape} matches neither "
-                    f"len(time)={len(time)} nor len(dim_1)={len(dim_1)}; the "
-                    "profile data is inconsistent."
+                    "Profile data is inconsistent: "
+                    f"profile values shape {values.shape} matches neither "
+                    "(time, dim_1), nor (dim_1, time)."
                 )
             values = values.T
         return xr.DataArray(
@@ -234,8 +231,11 @@ class ImageData(Data):
     frame: int
     values: str | list[int]  # Base64-encoded string or raw encoded file bytes
 
-    def to_processed(self) -> np.ndarray:
-        """Decoded pixel array: (H, W) grayscale, (H, W, 3) RGB, (H, W, 4) RGBA."""
+    def to_processed(self) -> numpy.ndarray:
+        """Decoded pixel array, preserving Pillow dtype (e.g. LA, CMYK, etc).
+        Shapes: (H, W) grayscale, (H, W, 3) RGB, (H, W, 4) RGBA.
+        Palettes are expanded to RGBA.
+        """
         try:
             raw = (
                 base64.b64decode(self.values)
@@ -248,7 +248,7 @@ class ImageData(Data):
             raise ValueError(f"Could not decode image data: {e}") from e
         if image.mode in ("P", "PA"):
             image = image.convert("RGBA")
-        return np.asarray(image)
+        return numpy.asarray(image)
 
     def summary(self) -> ImageDataSummary:
         # values may be base64-encoded, or raw encoded file bytes when return_raw is set

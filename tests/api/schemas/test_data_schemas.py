@@ -108,12 +108,24 @@ def test_profile2d_to_processed_transposed_input():
     assert da.values.tolist() == [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]]
 
 
-def test_profile2d_to_processed_inconsistent_shape_raises():
+@pytest.mark.parametrize(
+    "values",
+    [
+        [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0], [7.0, 8.0]],
+        [[1.0], [2.0], [3.0]],
+        [[1.0], [2.0]],
+    ],
+    ids=[
+        "wrong-first-axis",
+        "wrong-time-first-second-axis",
+        "wrong-transposed-second-axis",
+    ],
+)
+def test_profile2d_to_processed_inconsistent_shape_raises(values):
     profile = Profile2DData(
         time=[0.0, 1.0, 2.0],
         dim_1=[10.0, 20.0],
-        # 4 rows matches neither len(time) nor len(dim_1)
-        values=[[1.0, 2.0], [3.0, 4.0], [5.0, 6.0], [7.0, 8.0]],
+        values=values,
     )
 
     with pytest.raises(ValueError, match="matches neither"):

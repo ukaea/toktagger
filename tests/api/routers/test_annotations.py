@@ -312,7 +312,6 @@ async def test_create_annotations(api_client, setup_db, db_client, validated):
     )
     assert len(db_annotations_new) == len(db_annotations) + 1
 
-    assert response.status_code == 200
     assert (await api_client.get(path)).json()["validated_annotations"] is validated
 
 

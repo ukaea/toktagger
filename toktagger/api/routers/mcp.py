@@ -1,5 +1,8 @@
 import importlib
 
+from fastapi import APIRouter
+from fastapi.responses import JSONResponse
+
 try:
     from httpx2 import Request
 except ImportError:
@@ -12,6 +15,21 @@ def mcp_dependencies_installed() -> bool:
 
 if mcp_dependencies_installed():
     from fastmcp.server.dependencies import get_http_request
+
+
+router = APIRouter(prefix="/mcp")
+
+
+@router.api_route("", methods=["GET", "POST", "DELETE"], include_in_schema=False)
+@router.api_route("/", methods=["GET", "POST", "DELETE"], include_in_schema=False)
+async def mcp_disabled() -> JSONResponse:
+    return JSONResponse(
+        status_code=503,
+        content={
+            "detail": "MCP is disabled. Set server.mcp_enabled = true in toktagger.toml "
+            "and restart TokTagger. Requires the toktagger[mcp] optional extra."
+        },
+    )
 
 
 async def forward_mcp_authorization(request: Request) -> None:

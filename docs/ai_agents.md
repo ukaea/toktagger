@@ -17,6 +17,8 @@ Or via environment token:
 SERVER_MCP_ENABLED = true
 ```
 
+Restart TokTagger after changing this setting.
+
 ## User Setup
 For your AI agent to be able to access the MCP server, you will need to configure it within your harness.
 

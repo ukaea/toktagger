@@ -389,7 +389,7 @@ async def get_annotation(
     sample_id: str,
     annotation_id: str,
 ) -> AnnotationOutTypes:
-    """Fetch a scoped annotation, optionally restricting it to a visible author."""
+    """Fetch a single annotation by its ID (ignoring show_others_annotations preference)."""
     filters = {
         "_id": convert_to_objectid(annotation_id, "annotations"),
         "project_id": convert_to_objectid(project_id, "projects"),

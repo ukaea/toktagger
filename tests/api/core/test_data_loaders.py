@@ -604,6 +604,37 @@ def test_fair_mast_dataloader():
     assert numpy.max(ip_values) == 649008.875
 
 
+@pytest.mark.parametrize("dims", [("time", "psi_norm"), ("psi_norm", "time")])
+def test_fair_mast_loader_2d_signal(monkeypatch, dims):
+    time = numpy.array([0.0, 0.1, 0.2])
+    psi_norm = numpy.array([0.0, 0.25, 0.5, 1.0])
+    profile = numpy.arange(12.0).reshape(3, 4)
+    stored = profile if dims[0] == "time" else profile.T
+    tree = xarray.DataTree.from_dict(
+        {
+            "equilibrium": xarray.Dataset(
+                {"f": (dims, stored)}, coords={"time": time, "psi_norm": psi_norm}
+            )
+        }
+    )
+    monkeypatch.setattr(data_loaders.xr, "open_datatree", lambda *_, **__: tree)
+    data_loaders._get_fair_mast_signals.cache_clear()
+    sample = Sample(
+        shot_id=1,
+        data=ShotData(protocol="fair_mast", signal_names=["equilibrium/f"]),
+        _id="test",
+        project_id="test",
+        validated_annotations=False,
+    )
+
+    data = data_loaders.FAIRMASTDataLoader().get_sample(sample, params=DataParams())
+
+    assert isinstance(data, MultiProfile2DData)
+    assert data.values["equilibrium/f"] == Profile2DData(
+        time=time.tolist(), dim_1=psi_norm.tolist(), values=profile.tolist()
+    )
+
+
 @pytest.mark.parametrize(
     "file_name",
     [
