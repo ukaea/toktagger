@@ -1,6 +1,6 @@
 import base64
 import io
-from typing import Literal, NoReturn, Union
+from typing import Literal, Union
 
 import numpy as np
 import pandas as pd
@@ -75,7 +75,7 @@ class MultiVariateProfile2DDataSummary(DataSummary):
 
 
 class Data(BaseModel):
-    def to_processed(self) -> NoReturn:
+    def to_processed(self) -> pd.DataFrame | numpy.ndarray | xr.Dataset:
         """Bare Data carries no payload to convert."""
         raise ValueError("The bare Data type carries no payload to convert.")
 
