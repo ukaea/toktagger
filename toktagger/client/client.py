@@ -71,7 +71,7 @@ class TokTaggerClient:
     def __init__(
         self,
         base_url: str = "http://localhost:8002",
-        api_token: str | None = os.environ.get("TOKTAGGER_API_TOKEN"),
+        api_token: str | None = None,
         timeout: float = 30.0,
         transport: httpx.BaseTransport | None = None,
     ):
@@ -82,14 +82,14 @@ class TokTaggerClient:
         base_url : str
             Base URL of the TokTagger server; a trailing slash is stripped, by default "http://localhost:8002"
         api_token : str, optional
-            API bearer token, defaulting to TOKTAGGER_API_TOKEN read when this
-            module is imported. A missing or empty token raises TokTaggerClientError.
+            API bearer token, defaulting to TOKTAGGER_API_TOKEN env var if not specified.
         timeout : float
             Per-request HTTP timeout, in seconds, by default 30.0
         transport : httpx.BaseTransport, optional
             A custom httpx transport. Intended as a test hook (e.g.
             `httpx.MockTransport`); leave unset for normal use.
         """
+        api_token = api_token or os.environ.get("TOKTAGGER_API_TOKEN")
         if not api_token:
             raise TokTaggerClientError(
                 "No API token specified! Create one via the UI and specify it when initializing the Client, or set it as the `TOKTAGGER_API_TOKEN` environment variable."
