@@ -18,7 +18,7 @@ class AuthenticationError(TokTaggerAPIError):
     """401 response, indicating failure to authenticate."""
 
 
-class PermissionError(TokTaggerAPIError):
+class TokTaggerPermissionError(TokTaggerAPIError):
     """403 response, indicating permissions error."""
 
 

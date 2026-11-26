@@ -22,7 +22,7 @@ from toktagger.client.exceptions import (
     MultipleResultsFoundError,
     NotFoundError,
     AuthenticationError,
-    PermissionError,
+    TokTaggerPermissionError,
     TokTaggerAPIError,
     TokTaggerClientError,
 )
@@ -583,7 +583,7 @@ class TokTaggerClient:
                     "Client could not authenticate with the TokTagger server - have you set a valid API token?",
                 )
             elif response.status_code == 403:
-                raise PermissionError(response.status_code, detail)
+                raise TokTaggerPermissionError(response.status_code, detail)
             elif response.status_code == 404:
                 raise NotFoundError(response.status_code, detail)
             raise TokTaggerAPIError(response.status_code, detail)

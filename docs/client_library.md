@@ -174,11 +174,11 @@ All client errors derive from `TokTaggerClientError`, so you can catch them all 
 | `TokTaggerClientError` | no API token is supplied, the server cannot be reached, or another client-side error |
 | `TokTaggerAPIError` | the API returns a non-2xx response; has `status_code` and `detail` attributes |
 | `AuthenticationError` | a 401 response: the server rejected authentication |
-| `PermissionError` | a 403 response: the caller lacks permission |
+| `TokTaggerPermissionError` | a 403 response: the caller lacks permission |
 | `NotFoundError` | a 404 response, or a by-name / by-shot-ID lookup that matched nothing |
 | `MultipleResultsFoundError` | a by-name / by-shot-ID lookup matched more than one record |
 
-`AuthenticationError`, `PermissionError` and `NotFoundError` inherit from `TokTaggerAPIError` and expose `status_code` and `detail`. Import them from `toktagger.client.exceptions`; its `PermissionError` is distinct from Python's built-in exception.
+`AuthenticationError`, `TokTaggerPermissionError` and `NotFoundError` inherit from `TokTaggerAPIError` and expose `status_code` and `detail`. Import them from `toktagger.client.exceptions`.
 
 ```python
 from toktagger.client import TokTaggerClient

@@ -7,6 +7,7 @@ from toktagger.client.exceptions import (
     NotFoundError,
     TokTaggerAPIError,
     TokTaggerClientError,
+    TokTaggerPermissionError,
 )
 
 
@@ -64,6 +65,11 @@ def test_error_hierarchy():
     not_found = NotFoundError(None, "no match")
     assert isinstance(not_found, TokTaggerAPIError)
     assert not_found.status_code is None
+    forbidden = TokTaggerPermissionError(403, "Forbidden")
+    assert isinstance(forbidden, TokTaggerAPIError)
+    assert not isinstance(forbidden, PermissionError)
+    assert forbidden.status_code == 403
+    assert forbidden.detail == "Forbidden"
 
 
 def test_sample_get_annotation_without_client(toktagger_client, setup_db):
