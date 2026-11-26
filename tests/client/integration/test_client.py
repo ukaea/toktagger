@@ -12,7 +12,6 @@ from toktagger.client.client import (
 )
 from toktagger.client.exceptions import (
     NotFoundError,
-    MultipleResultsFoundError,
 )
 
 # Valid ObjectId format but absent from the server database
@@ -72,16 +71,10 @@ def test_get_project_by_name(integration_toktagger_client, seeded_project_with_s
 
 def test_get_project_by_name_missing(integration_toktagger_client):
     with pytest.raises(NotFoundError) as exc_info:
-        integration_toktagger_client.get_project_by_name("toktagger-does-not-exist-xyz")
+        # Substring which does match, but not an exact match, expect NotFound
+        integration_toktagger_client.get_project_by_name("seeded")
     # Client-side lookup error: no HTTP status code
     assert exc_info.value.status_code is None
-
-
-def test_get_project_by_name_multiple(
-    integration_toktagger_client, seeded_project, seeded_project_with_samples
-):
-    with pytest.raises(MultipleResultsFoundError):
-        integration_toktagger_client.get_project_by_name("seeded")
 
 
 def test_list_samples(integration_toktagger_client, seeded_project_with_samples):

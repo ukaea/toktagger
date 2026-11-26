@@ -250,15 +250,16 @@ class TokTaggerClient:
             If the API returns a non-2xx response.
         """
         projects = self.list_projects(name=name)
-        if len(projects) == 0:
+        exact_matches = [project for project in projects if project.name == name]
+        if len(exact_matches) == 0:
             raise NotFoundError(None, f"No project found matching name '{name}'.")
-        if len(projects) > 1:
+        if len(exact_matches) > 1:
             raise MultipleResultsFoundError(
-                f"{len(projects)} projects matched name '{name}'; "
-                f"use list_projects() to see all projects matching this name,"
-                f"or use get_project() with a specific project ID."
+                f"{len(exact_matches)} projects matched name '{name}'; "
+                f"use list_projects(name={name}) to see all projects matching this name,"
+                "or use get_project() with a specific project ID."
             )
-        return projects[0]
+        return exact_matches[0]
 
     def list_samples(
         self,
