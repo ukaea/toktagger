@@ -5,7 +5,6 @@
 import pathlib
 
 import pytest
-import requests
 import tests.endpoints as endpoints
 from toktagger.client import TokTaggerClient
 from toktagger.api.schemas.annotations import TimeRegion
@@ -16,14 +15,16 @@ BASE_URL = "http://localhost:8002"
 @pytest.fixture()
 def integration_toktagger_client(server_setup):
     token = endpoints.create_api_token()
-    yield TokTaggerClient(base_url=BASE_URL, api_token=token)
+    with TokTaggerClient(base_url=BASE_URL, api_token=token) as client:
+        yield client
 
 
 @pytest.fixture()
 def seeded_project(integration_toktagger_client):
     project_id = endpoints.create_project("seeded_project", "time-series", "tabular")
     yield project_id, []
-    requests.delete(f"{BASE_URL}/projects/{project_id}")
+    response = endpoints.session.delete(f"{BASE_URL}/projects/{project_id}")
+    assert response.status_code == 200, response.text
 
 
 @pytest.fixture()
@@ -63,7 +64,8 @@ def seeded_project_with_samples(integration_toktagger_client):
         [flat_top.model_dump(mode="json")],
     )
     yield project_id, sample_ids, annotation_ids
-    requests.delete(f"{BASE_URL}/projects/{project_id}")
+    response = endpoints.session.delete(f"{BASE_URL}/projects/{project_id}")
+    assert response.status_code == 200, response.text
 
 
 @pytest.fixture()
@@ -81,7 +83,8 @@ def seeded_profile2d_project(integration_toktagger_client):
         file_names=["profile2d.parquet"],
     )
     yield project_id, sample_ids
-    requests.delete(f"{BASE_URL}/projects/{project_id}")
+    response = endpoints.session.delete(f"{BASE_URL}/projects/{project_id}")
+    assert response.status_code == 200, response.text
 
 
 @pytest.fixture()
@@ -97,4 +100,5 @@ def seeded_image_project(integration_toktagger_client):
         "png",
     )
     yield project_id, sample_ids
-    requests.delete(f"{BASE_URL}/projects/{project_id}")
+    response = endpoints.session.delete(f"{BASE_URL}/projects/{project_id}")
+    assert response.status_code == 200, response.text
