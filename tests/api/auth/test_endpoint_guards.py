@@ -227,6 +227,19 @@ ACTIONS: dict[str, Action] = {
             "global_admin": _not_forbidden(),
         },
     ),
+    "get_data_summary": Action(
+        method="POST",
+        path="/projects/{project_id}/samples/{sample_id}/data/summary",
+        body=lambda *_: {},
+        expected={
+            "unauthenticated": _status(401),
+            "non_member": _status(403),
+            "viewer": _not_forbidden(),
+            "annotator": _not_forbidden(),
+            "project_admin": _not_forbidden(),
+            "global_admin": _not_forbidden(),
+        },
+    ),
     "update_project": Action(
         method="PUT",
         path="/projects/{project_id}",

@@ -33,12 +33,12 @@ def test_admin_can_deactivate_and_reactivate_user(server_setup, admin_token, pag
     page.goto("http://localhost:8002/ui/admin/users")
 
     row = _user_row(page, "flipflop")
-    row.get_by_role("button", name="Deactivate").click()
-    expect(row.get_by_role("button", name="Activate")).to_be_visible()
+    row.get_by_role("button", name="Deactivate", exact=True).click()
+    expect(row.get_by_role("button", name="Activate", exact=True)).to_be_visible()
     assert get_user(user_id)["is_active"] is False
 
-    row.get_by_role("button", name="Activate").click()
-    expect(row.get_by_role("button", name="Deactivate")).to_be_visible()
+    row.get_by_role("button", name="Activate", exact=True).click()
+    expect(row.get_by_role("button", name="Deactivate", exact=True)).to_be_visible()
     assert get_user(user_id)["is_active"] is True
 
 
@@ -59,7 +59,7 @@ def test_admin_cannot_deactivate_or_delete_self(server_setup, page):
     page.goto("http://localhost:8002/ui/admin/users")
 
     row = _user_row(page, "admin")
-    expect(row.get_by_role("button", name="Deactivate")).to_be_disabled()
+    expect(row.get_by_role("button", name="Deactivate", exact=True)).to_be_disabled()
     expect(row.get_by_role("button", name="Delete")).to_be_disabled()
 
 

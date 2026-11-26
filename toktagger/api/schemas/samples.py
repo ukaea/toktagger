@@ -25,12 +25,19 @@ class TimeSeriesFileData(FileData):
     signal_names: list[str] | None = None
 
 
+class DefuseFileData(FileData):
+    type: Literal["h5"]
+    signal_names: list[str] | None = None
+
+
 class ShotData(BaseModel):
     protocol: Literal["uda", "uda_camera", "sal", "fair_mast"]
     signal_names: Annotated[list[str], Field(min_length=1)]
 
 
-DataTypes = TimeSeriesFileData | ImageFileData | ImageArrayFileData | ShotData
+DataTypes = (
+    TimeSeriesFileData | DefuseFileData | ImageFileData | ImageArrayFileData | ShotData
+)
 
 
 class SampleBase(ConfiguredModel):

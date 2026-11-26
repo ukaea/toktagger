@@ -25,6 +25,7 @@ A project defines the annotation task, data source, and labeling configuration f
         - `sal` - Load signals using SAL (for JET data)
         - `fair_mast` - Load signals from the [FAIR-MAST](https://mastapp.site/) data repository
         - `tabular` - Load CSV/TSV/Parquet files from local disk
+        - `defuse` - Load signals from local DEFUSE HDF5 output files
         - `image` - Load images from local PNG / JPEG files
         - `image-array` - Load Numpy arrays as images from local `.npy` or `.npz` files
     - **Query Strategy**: Navigation strategy to select the next sample to annotate:

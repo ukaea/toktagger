@@ -46,6 +46,7 @@ dependencies = [
   "httpx>=0.28.1",
   "canaille[front,oidc,server,sqlite]>=0.2.7",
   "joserfc>=1.6,<1.8",
+  "h5py>=3.16.0",
 ]
 [project.optional-dependencies]
 models = [
@@ -55,6 +56,9 @@ models = [
   "mlflow>=3.1.4",
   "safetensors>=0.7.0",
   "huggingface-hub>=1.22.0",
+]
+mcp = [
+  "fastmcp>=4.1.6",
 ]
 
 [build-system]
