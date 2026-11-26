@@ -149,12 +149,12 @@ class Profile2DData(Data):
         dim_1 = numpy.asarray(self.dim_1, dtype=float)
         if values.ndim != 2:
             raise ValueError(f"Profile values must be 2D, got shape {values.shape}.")
-        if values.shape[0] != len(time):
-            if values.shape[0] != len(dim_1):
+        if values.shape != (len(time), len(dim_1)):
+            if values.shape != (len(dim_1), len(time)):
                 raise ValueError(
-                    f"Profile values shape {values.shape} matches neither "
-                    f"len(time)={len(time)} nor len(dim_1)={len(dim_1)}; the "
-                    "profile data is inconsistent."
+                    "Profile data is inconsistent: "
+                    f"profile values shape {values.shape} matches neither "
+                    "(time, dim_1), nor (dim_1, time)."
                 )
             values = values.T
         return xr.DataArray(
