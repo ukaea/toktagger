@@ -30,7 +30,10 @@ from toktagger.api.auth.core import get_internal_token, get_signing_secret
 from toktagger.api.core.data_loaders import LoaderRegistry
 from toktagger.api.crud.db import LockTimeoutError, MongoDBClient
 from toktagger.api.models import models_dependencies_installed
-from toktagger.api.routers.mcp import mcp_dependencies_installed
+from toktagger.api.routers.mcp import (
+    router as mcp_disabled_router,
+    mcp_dependencies_installed,
+)
 from toktagger.api.routers.annotations import router as annotations_router
 from toktagger.api.routers.annotators import router as annotators_router
 from toktagger.api.routers.auth import router as auth_router
@@ -352,6 +355,7 @@ class Server:
             self.app.mount("/mcp", mcp_http_app)
         else:
             self._mcp_app = None
+            self.app.include_router(mcp_disabled_router)
 
         self.app.add_exception_handler(LockTimeoutError, lock_timeout_handler)
 

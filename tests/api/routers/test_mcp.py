@@ -9,10 +9,25 @@ from toktagger.api.routers.mcp import INSTRUCTIONS, mcp_dependencies_installed
 if mcp_dependencies_installed():
     from fastmcp.exceptions import ToolError
 
-pytestmark = pytest.mark.mcp_enabled
+
+@pytest.mark.asyncio
+@pytest.mark.mcp_disabled
+@pytest.mark.parametrize("path", ["/mcp", "/mcp/"])
+@pytest.mark.parametrize("method", ["GET", "POST", "DELETE"])
+async def test_disabled_mcp_returns_actionable_error(api_client, path, method):
+    response = await api_client.request(method, path)
+
+    assert response.status_code == 503
+    assert response.headers["content-type"] == "application/json"
+    assert "location" not in response.headers
+    assert response.json() == {
+        "detail": "MCP is disabled. Set server.mcp_enabled = true in toktagger.toml "
+        "and restart TokTagger. Requires the toktagger[mcp] optional extra."
+    }
 
 
 @pytest.mark.asyncio
+@pytest.mark.mcp_enabled
 async def test_expected_tools(mcp_client):
     """Every MCP tagged endpoint should be exposed as a tool, and nothing else."""
     tools = await mcp_client.list_tools()
@@ -77,6 +92,7 @@ async def test_expected_tools(mcp_client):
 
 
 @pytest.mark.asyncio
+@pytest.mark.mcp_enabled
 async def test_tool_descriptions(mcp_client):
     """Tool descriptions should carry the usage guidance from the endpoint docstrings."""
     tools = await mcp_client.list_tools()
@@ -89,6 +105,7 @@ async def test_tool_descriptions(mcp_client):
 
 
 @pytest.mark.asyncio
+@pytest.mark.mcp_enabled
 async def test_server_instructions(mcp_client):
     """Top level server instructions should be available to the client."""
     assert mcp_client.server_info.name == "toktagger"
@@ -99,6 +116,7 @@ async def test_server_instructions(mcp_client):
 
 
 @pytest.mark.asyncio
+@pytest.mark.mcp_enabled
 async def test_get_projects(mcp_client, setup_db):
     result = await mcp_client.call_tool(
         "get_projects",
@@ -114,6 +132,7 @@ async def test_get_projects(mcp_client, setup_db):
 
 
 @pytest.mark.asyncio
+@pytest.mark.mcp_enabled
 async def test_get_projects_filtered(mcp_client, setup_db):
     result = await mcp_client.call_tool("get_projects", arguments={"name": "test"})
     assert result is not None
@@ -126,6 +145,7 @@ async def test_get_projects_filtered(mcp_client, setup_db):
 
 
 @pytest.mark.asyncio
+@pytest.mark.mcp_enabled
 async def test_post_create_project(mcp_client, setup_db):
     result = await mcp_client.call_tool(
         "create_project",
@@ -147,6 +167,7 @@ async def test_post_create_project(mcp_client, setup_db):
 
 
 @pytest.mark.asyncio
+@pytest.mark.mcp_enabled
 async def test_put_update_project(mcp_client, setup_db):
     result = await mcp_client.call_tool(
         "update_project",
@@ -169,6 +190,7 @@ async def test_put_update_project(mcp_client, setup_db):
 
 
 @pytest.mark.asyncio
+@pytest.mark.mcp_enabled
 async def test_post_add_samples(mcp_client, setup_db):
     result = await mcp_client.call_tool(
         "add_samples",
@@ -193,6 +215,7 @@ async def test_post_add_samples(mcp_client, setup_db):
 
 
 @pytest.mark.asyncio
+@pytest.mark.mcp_enabled
 async def test_put_update_samples(mcp_client, setup_db):
     result = await mcp_client.call_tool(
         "update_samples",
@@ -221,6 +244,7 @@ async def test_put_update_samples(mcp_client, setup_db):
 
 
 @pytest.mark.asyncio
+@pytest.mark.mcp_enabled
 async def test_put_update_sample_annotations(mcp_client, setup_db):
     result = await mcp_client.call_tool(
         "update_sample_annotations",
@@ -256,6 +280,7 @@ async def test_put_update_sample_annotations(mcp_client, setup_db):
 
 
 @pytest.mark.asyncio
+@pytest.mark.mcp_enabled
 async def test_get_single_annotation(mcp_client, setup_db):
     result = await mcp_client.call_tool(
         "get_annotation",
@@ -273,6 +298,7 @@ async def test_get_single_annotation(mcp_client, setup_db):
 
 
 @pytest.mark.asyncio
+@pytest.mark.mcp_enabled
 async def test_put_update_single_annotation(mcp_client, setup_db):
     result = await mcp_client.call_tool(
         "update_annotation",
@@ -305,6 +331,7 @@ async def test_put_update_single_annotation(mcp_client, setup_db):
 
 
 @pytest.mark.asyncio
+@pytest.mark.mcp_enabled
 async def test_post_import_annotations(mcp_client, setup_db):
     result = await mcp_client.call_tool(
         "import_annotations",
@@ -334,6 +361,7 @@ async def test_post_import_annotations(mcp_client, setup_db):
 
 
 @pytest.mark.asyncio
+@pytest.mark.mcp_enabled
 async def test_post_get_sample_data_summary(mcp_client, setup_db):
     result = await mcp_client.call_tool(
         "get_sample_data_summary",
@@ -349,6 +377,7 @@ async def test_post_get_sample_data_summary(mcp_client, setup_db):
 
 
 @pytest.mark.asyncio
+@pytest.mark.mcp_enabled
 async def test_post_get_next_sample(mcp_client, setup_db):
     result = await mcp_client.call_tool(
         "get_next_sample",
@@ -363,6 +392,7 @@ async def test_post_get_next_sample(mcp_client, setup_db):
 
 
 @pytest.mark.asyncio
+@pytest.mark.mcp_enabled
 async def test_error_for_unknown_project(mcp_client, setup_db):
     """API errors should propagate back through the MCP tool call."""
     with pytest.raises(ToolError, match="HTTP error 404"):
@@ -373,6 +403,7 @@ async def test_error_for_unknown_project(mcp_client, setup_db):
 
 
 @pytest.mark.asyncio
+@pytest.mark.mcp_enabled
 @pytest.mark.parametrize("transport", ["rest", "mcp"])
 async def test_annotation_lock_timeout(
     transport, api_client, mcp_client, setup_db, monkeypatch
@@ -414,6 +445,7 @@ async def test_annotation_lock_timeout(
 
 
 @pytest.mark.asyncio
+@pytest.mark.mcp_enabled
 async def test_error_for_unsupported_tool(mcp_client, setup_db):
     """Should not be able to get raw sample data via MCP"""
     with pytest.raises(ToolError, match="Unknown tool"):
@@ -427,6 +459,7 @@ async def test_error_for_unsupported_tool(mcp_client, setup_db):
 
 
 @pytest.mark.asyncio
+@pytest.mark.mcp_enabled
 async def test_error_for_unauthenticated(mcp_client, api_client, setup_db):
     """Cannot use MCP tool without valid token"""
 
